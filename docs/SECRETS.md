@@ -18,12 +18,14 @@
 ## Fluxo recomendado de migração/rotação
 
 1. Executar `pwsh ./scripts/migrate-secrets.ps1` para detectar legados.
-2. Revogar credenciais expostas.
-3. Gerar novas credenciais.
-4. Salvar no cofre (Bitwarden) e injetar por variável de ambiente/local privado.
+2. Executar `pwsh ./scripts/check-secrets-deps.ps1` para validar dependências e proteções do repositório.
+3. Revogar credenciais expostas.
+4. Gerar novas credenciais.
+5. Salvar no cofre (Bitwarden) e injetar por variável de ambiente/local privado.
 
 ## Referências
 
 - [Validação automática](../scripts/validate.ps1)
 - [Migração de segredos](../scripts/migrate-secrets.ps1)
+- [Dependências de segredos](../scripts/check-secrets-deps.ps1)
 - [Gitignore do repositório](../.gitignore)

@@ -12,6 +12,12 @@ winget install twpayne.chezmoi Git.Git Microsoft.PowerShell GitHub.cli
 chezmoi init --apply <SEU_USER_GITHUB>/windots
 ```
 
+Alternativa em comando único (remote install script):
+
+```powershell
+irm https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1 | iex
+```
+
 ## 3) Bootstrap (recomendado)
 
 ```powershell

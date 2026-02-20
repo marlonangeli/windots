@@ -23,6 +23,14 @@ pwsh ./scripts/bootstrap.ps1 -Mode full
 pwsh ./scripts/validate.ps1
 ```
 
+### One-command installer (remote)
+
+```powershell
+irm https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1 | iex
+```
+
+Esse comando baixa o `init.ps1`, instala dependências base, aplica o repo com `chezmoi`, executa bootstrap, validação e checks de segredos.
+
 ## Desenvolvimento local
 
 ```powershell
@@ -40,6 +48,7 @@ pwsh ./scripts/validate.ps1
 - `scripts/link-ai-configs.ps1`: copia/symlink de `home/dot_config/ai` para `~/.config/ai`
 - `scripts/export-current.ps1`: exporta estado local para `_staging`
 - `scripts/migrate-secrets.ps1`: checagem de legados (`.jira_access_token`, `tfstoken`)
+- `scripts/check-secrets-deps.ps1`: auditoria de dependências e proteções para segredos
 
 ## Estrutura
 
