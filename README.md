@@ -1,70 +1,58 @@
 # windots
 
-Dotfiles Windows para produtividade Dev/AI com Chezmoi + PowerShell: PowerShell, Windows Terminal, Git, Zed, Codex, MCP e automacoes idempotentes.
+Dotfiles Windows para produtividade Dev/AI com `chezmoi` + PowerShell, com foco em reprodutibilidade, segurança e automação idempotente.
 
-## Objetivo
+## Escopo
 
-Padronizar setup de ambiente Windows com foco em performance, reproducibilidade e seguranca.
-
-## O que esta incluso
-
-- PowerShell profile modular (modo full/clean)
-- Windows Terminal (Catppuccin + JetBrains Mono Nerd Font)
-- Git (config base e include local privado)
-- Zed, Codex, Copilot (templates sanitizados)
-- Configs em `.config` (jira/acli/opencode) com segregacao de segredos
-- Scripts de bootstrap, instalacao e validacao
-- Estrutura `.config/ai` para MCP/skills
+- Perfil PowerShell modular (`full`/`clean`) em `home/dot_config/powershell/`
+- Configs de terminal, Git, Zed, Codex, Copilot e ferramentas AI/MCP
+- Scripts operacionais em `scripts/` para bootstrap, instalação, validação e migração de segredos
 
 ## Requisitos
 
 - PowerShell 7+
 - Git
 - [chezmoi](https://www.chezmoi.io/)
-- opcional: `gh`, `bw`, `mise`
+- Opcional: `gh`, `bw`, `mise`
 
 ## Quick Start
 
 ```powershell
 chezmoi init --apply <SEU_USER_GITHUB>/windots
+pwsh ./scripts/bootstrap.ps1 -Mode full
+pwsh ./scripts/validate.ps1
 ```
 
-### Desenvolvimento local
+## Desenvolvimento local
 
 ```powershell
 chezmoi init --source .
 chezmoi diff
 chezmoi apply
+pwsh ./scripts/validate.ps1
 ```
 
-## Segredos
+## Scripts principais
 
-Nunca versione tokens/chaves. Use Bitwarden CLI (`bw`) e arquivos locais privados.
-
-Veja `docs/SECRETS.md`.
-
-## Scripts
-
-- `scripts/bootstrap.ps1`: setup principal pos-apply
-- `scripts/install-tools.ps1`: instala toolchain
-- `scripts/validate.ps1`: checks de seguranca e consistencia
-- `scripts/link-ai-configs.ps1`: sincroniza configuracoes MCP/skills
-- `scripts/export-current.ps1`: exporta estado atual para staging de templates
+- `scripts/bootstrap.ps1`: executa instalação opcional, `chezmoi apply` e sincronização AI
+- `scripts/install-tools.ps1`: instala toolchain base via `winget`
+- `scripts/validate.ps1`: valida arquivos obrigatórios e padrões de segredos
+- `scripts/link-ai-configs.ps1`: copia/symlink de `home/dot_config/ai` para `~/.config/ai`
+- `scripts/export-current.ps1`: exporta estado local para `_staging`
+- `scripts/migrate-secrets.ps1`: checagem de legados (`.jira_access_token`, `tfstoken`)
 
 ## Estrutura
 
 ```text
-home/
-  dot_config/
-  dot_codex/
-  dot_copilot/
-  AppData/.../WindowsTerminal/settings.json.tmpl
-  AppData/.../Zed/settings.json.tmpl
+home/      # templates chezmoi (dotfiles e configs)
+scripts/   # automações de setup/validação/migração
+docs/      # documentação de setup, segredos, migração e decisões
 ```
 
-## Roadmap
+## Documentação
 
-- Espelhamento Azure DevOps
-- VS Code profile sanitizado por camadas
-- WSL por distro (Ubuntu/Arch)
-- Fluxo de skills/MCP por host
+- [Setup](docs/SETUP.md)
+- [Segredos](docs/SECRETS.md)
+- [Migração](docs/MIGRATION.md)
+- [Decisões](docs/DECISIONS.md)
+- [PowerShell profile docs](home/dot_config/powershell/docs/README.md)

@@ -17,6 +17,8 @@ private/
 **/tmp/
 **/node_modules/
 **/.cache/
+.ai/
+**/.ai/
 
 # Codex/Copilot volatile
 home/dot_codex/sessions/

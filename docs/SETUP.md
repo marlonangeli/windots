@@ -12,14 +12,32 @@ winget install twpayne.chezmoi Git.Git Microsoft.PowerShell GitHub.cli
 chezmoi init --apply <SEU_USER_GITHUB>/windots
 ```
 
-## 3) Bootstrap
+## 3) Bootstrap (recomendado)
 
 ```powershell
 pwsh ./scripts/bootstrap.ps1 -Mode full
 ```
 
-## 4) Validar
+Notas:
+- `-Mode clean` reduz instalação para cenário mais enxuto.
+- `-SkipInstall` aplica configs sem reinstalar ferramentas.
+
+## 4) Validar consistência e segredos
 
 ```powershell
 pwsh ./scripts/validate.ps1
 ```
+
+## 5) Sincronizar AI configs manualmente (opcional)
+
+```powershell
+pwsh ./scripts/link-ai-configs.ps1
+# ou
+pwsh ./scripts/link-ai-configs.ps1 -UseSymlink
+```
+
+## Referências
+
+- [README](../README.md)
+- [Segredos](./SECRETS.md)
+- [Perfil PowerShell](../home/dot_config/powershell/docs/README.md)
