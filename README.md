@@ -46,6 +46,7 @@ pwsh ./scripts/validate.ps1
 - `scripts/install-tools.ps1`: instala toolchain base via `winget`
 - `scripts/validate.ps1`: valida arquivos obrigatórios e padrões de segredos
 - `scripts/link-ai-configs.ps1`: copia/symlink de `home/dot_config/ai` para `~/.config/ai`
+- `scripts/install-profile-shim.ps1`: cria perfil shim no caminho oficial do PowerShell apontando para `~/.config/powershell`
 - `scripts/export-current.ps1`: exporta estado local para `_staging`
 - `scripts/migrate-secrets.ps1`: checagem de legados (`.jira_access_token`, `tfstoken`)
 - `scripts/check-secrets-deps.ps1`: auditoria de dependências e proteções para segredos

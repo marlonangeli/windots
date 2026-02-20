@@ -21,4 +21,7 @@ if (Get-Command chezmoi -ErrorAction SilentlyContinue) {
 Write-Host "Linking AI config..." -ForegroundColor Cyan
 & "$PSScriptRoot\link-ai-configs.ps1"
 
+Write-Host "Installing PowerShell profile shim..." -ForegroundColor Cyan
+& "$PSScriptRoot\install-profile-shim.ps1"
+
 Write-Host "Bootstrap complete." -ForegroundColor Green
