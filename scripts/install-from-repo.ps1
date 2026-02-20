@@ -274,13 +274,14 @@ Log: $LogPath
         Write-Host ""
         Write-Host "Repository initialized only (manual apply mode)." -ForegroundColor Green
         Write-Host "Next commands:" -ForegroundColor Yellow
-        Write-Host "1) & '$script:chezmoiExe' apply" -ForegroundColor Yellow
-        Write-Host "2) pwsh '$bootstrapPath' -Mode $Mode" -ForegroundColor Yellow
-        Write-Host "3) pwsh '$validatePath'" -ForegroundColor Yellow
+        Write-Host "1) Set-Location '$sourcePath'" -ForegroundColor Yellow
+        Write-Host "2) chezmoi apply" -ForegroundColor Yellow
+        Write-Host "3) ./scripts/bootstrap.ps1 -Mode $Mode" -ForegroundColor Yellow
+        Write-Host "4) ./scripts/validate.ps1" -ForegroundColor Yellow
         if (-not $SkipSecretsChecks) {
-            Write-Host "4) pwsh '$migratePath'" -ForegroundColor Yellow
+            Write-Host "5) ./scripts/migrate-secrets.ps1" -ForegroundColor Yellow
             if (Test-Path $secretsDepsPath) {
-                Write-Host "5) pwsh '$secretsDepsPath'" -ForegroundColor Yellow
+                Write-Host "6) ./scripts/check-secrets-deps.ps1" -ForegroundColor Yellow
             }
         }
         Write-Host "Install log: $LogPath" -ForegroundColor Green
