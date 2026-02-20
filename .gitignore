@@ -1,0 +1,37 @@
+# Secrets and tokens
+**/auth.json
+**/*.token
+**/*.pat
+**/.jira_access_token
+**/id_rsa
+**/id_ed25519
+**/known_hosts
+
+# Local private overrides
+*.local.*
+private/
+
+# Runtime/caches
+**/sessions/
+**/log/
+**/tmp/
+**/node_modules/
+**/.cache/
+
+# Codex/Copilot volatile
+home/dot_codex/sessions/
+home/dot_codex/log/
+home/dot_copilot/logs/
+
+# Docker volatile
+home/dot_docker/contexts/
+home/dot_ssh/id_*
+
+# PowerShell transient
+**/PSReadLine/
+
+# Temporarily out of scope
+home/dot_config/whkdrc
+home/dot_sophos-vpn/
+
+_git/

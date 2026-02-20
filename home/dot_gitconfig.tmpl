@@ -1,0 +1,21 @@
+[core]
+	autocrlf = true
+	symlinks = true
+	longpaths = true
+	excludesfile = {{ .chezmoi.homeDir | quote }} + "\\.gitignore_global"
+[user]
+	name = {{ .name | quote }}
+	email = {{ .email | quote }}
+[credential]
+	helper = manager
+[push]
+	autoSetupRemote = true
+[alias]
+	s = status -sb
+	co = checkout
+	br = branch
+	ci = commit
+	st = status
+	d = diff
+[includeIf "gitdir:{{ .chezmoi.homeDir }}\\.local-repos\\"]
+	path = {{ .chezmoi.homeDir | quote }} + "\\.gitconfig.local"

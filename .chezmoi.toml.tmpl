@@ -1,0 +1,15 @@
+{{- $name := promptStringOnce "name" "Git user.name" -}}
+{{- $email := promptStringOnce "email" "Git user.email" -}}
+{{- $github := promptStringOnce "github_username" "GitHub username" -}}
+{{- $azureOrg := promptStringOnce "azure_org" "Azure DevOps organization URL (optional)" "" -}}
+{{- $azureProject := promptStringOnce "azure_project" "Azure DevOps default project (optional)" "" -}}
+[data]
+name = {{ $name | quote }}
+email = {{ $email | quote }}
+github_username = {{ $github | quote }}
+repo_name = "windots"
+azure_org = {{ $azureOrg | quote }}
+azure_project = {{ $azureProject | quote }}
+editor = "zed"
+terminal_font = "JetBrainsMono Nerd Font Mono"
+terminal_scheme = "Catppuccin Mocha"

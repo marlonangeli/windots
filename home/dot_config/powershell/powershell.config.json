@@ -1,0 +1,7 @@
+{
+  "Microsoft.PowerShell:ExecutionPolicy": "Unrestricted",
+  "DisableImplicitWinCompat": true,
+  "Microsoft.PowerShell.Core:ExperimentalFeatures": [],
+  "PSReadLine:ShowToolTips": false,
+  "PSReadLine:PredictionViewStyle": "ListView"
+}
