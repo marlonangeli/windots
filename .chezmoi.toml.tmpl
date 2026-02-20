@@ -1,8 +1,8 @@
-{{- $name := promptStringOnce "name" "Git user.name" "" -}}
-{{- $email := promptStringOnce "email" "Git user.email" "" -}}
-{{- $github := promptStringOnce "github_username" "GitHub username" "" -}}
-{{- $azureOrg := promptStringOnce "azure_org" "Azure DevOps organization URL (optional)" "" -}}
-{{- $azureProject := promptStringOnce "azure_project" "Azure DevOps default project (optional)" "" -}}
+{{- $name := env "CHEZMOI_NAME" -}}
+{{- $email := env "CHEZMOI_EMAIL" -}}
+{{- $github := env "CHEZMOI_GITHUB_USERNAME" -}}
+{{- $azureOrg := env "CHEZMOI_AZURE_ORG" -}}
+{{- $azureProject := env "CHEZMOI_AZURE_PROJECT" -}}
 [data]
 name = {{ $name | quote }}
 email = {{ $email | quote }}

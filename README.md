@@ -46,6 +46,9 @@ Para modo totalmente automático, use:
 & ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1"))) -AutoApply
 ```
 
+O instalador agora coleta dados interativamente (`user.name`, `user.email`, `github_username`, Azure opcional).  
+Para execução sem prompts: `-NoPrompt`.
+
 ## Desenvolvimento local
 
 ```powershell

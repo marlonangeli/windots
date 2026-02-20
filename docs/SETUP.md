@@ -25,6 +25,9 @@ Se quiser fluxo automático completo:
 & ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1"))) -AutoApply
 ```
 
+O fluxo pergunta dados de configuração (Git/GitHub/Azure opcional).  
+Para modo silencioso: `-NoPrompt`.
+
 Retry sem reinstalar dependências base:
 
 ```powershell

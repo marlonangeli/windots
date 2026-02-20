@@ -10,7 +10,8 @@ param(
     [switch]$UseSymlinkAI,
     [switch]$SkipSecretsChecks,
     [string]$LogPath,
-    [switch]$AutoApply
+    [switch]$AutoApply,
+    [switch]$NoPrompt
 )
 
 $ErrorActionPreference = "Stop"
@@ -77,6 +78,45 @@ function Invoke-Step {
 
     Write-Step $Name
     & $Action
+}
+
+function Prompt-OrDefault {
+    param(
+        [Parameter(Mandatory)][string]$Label,
+        [string]$Default = ""
+    )
+
+    if ($NoPrompt) { return $Default }
+
+    $suffix = if ([string]::IsNullOrWhiteSpace($Default)) { "" } else { " [$Default]" }
+    $value = Read-Host "$Label$suffix"
+    if ([string]::IsNullOrWhiteSpace($value)) { return $Default }
+    return $value
+}
+
+function Set-InstallerEnvData {
+    $defaultName = ""
+    $defaultEmail = ""
+    $defaultGithub = ""
+
+    try { $defaultName = (git config --global user.name 2>$null) } catch {}
+    try { $defaultEmail = (git config --global user.email 2>$null) } catch {}
+    if ($defaultEmail -and $defaultEmail -match "@") {
+        $defaultGithub = ($defaultEmail -split "@")[0]
+    }
+
+    Write-Step "Collecting setup data"
+    $name = Prompt-OrDefault -Label "Git user.name" -Default $defaultName
+    $email = Prompt-OrDefault -Label "Git user.email" -Default $defaultEmail
+    $github = Prompt-OrDefault -Label "GitHub username" -Default $defaultGithub
+    $azureOrg = Prompt-OrDefault -Label "Azure DevOps organization URL (optional)" -Default ""
+    $azureProject = Prompt-OrDefault -Label "Azure DevOps project (optional)" -Default ""
+
+    $env:CHEZMOI_NAME = $name
+    $env:CHEZMOI_EMAIL = $email
+    $env:CHEZMOI_GITHUB_USERNAME = $github
+    $env:CHEZMOI_AZURE_ORG = $azureOrg
+    $env:CHEZMOI_AZURE_PROJECT = $azureProject
 }
 
 function Get-RepoRemotePattern {
@@ -155,6 +195,8 @@ Log: $LogPath
         }
         Write-Host "    using chezmoi: $script:chezmoiExe" -ForegroundColor DarkGray
     }
+
+    Set-InstallerEnvData
 
     $sourcePath = $null
     Invoke-Step -Name "Initializing repository via chezmoi ($Repo)" -Action {
