@@ -18,6 +18,12 @@ Alternativa em comando único (remote install script):
 irm https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1 | iex
 ```
 
+Retry sem reinstalar dependências base:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1"))) -SkipBaseInstall
+```
+
 ## 3) Bootstrap (recomendado)
 
 ```powershell

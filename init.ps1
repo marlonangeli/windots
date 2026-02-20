@@ -1,5 +1,11 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet("full", "clean")]
+    [string]$Mode = "full",
+    [switch]$SkipBaseInstall,
+    [switch]$UseSymlinkAI,
+    [switch]$SkipSecretsChecks
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -14,4 +20,9 @@ if ([string]::IsNullOrWhiteSpace($installer)) {
     throw "Failed to download installer from $installerUrl"
 }
 
-& ([scriptblock]::Create($installer)) -Repo $repo
+& ([scriptblock]::Create($installer)) `
+    -Repo $repo `
+    -Mode $Mode `
+    -SkipBaseInstall:$SkipBaseInstall `
+    -UseSymlinkAI:$UseSymlinkAI `
+    -SkipSecretsChecks:$SkipSecretsChecks

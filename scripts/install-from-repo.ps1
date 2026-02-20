@@ -8,13 +8,18 @@ param(
 
     [switch]$SkipBaseInstall,
     [switch]$UseSymlinkAI,
-    [switch]$SkipSecretsChecks
+    [switch]$SkipSecretsChecks,
+    [string]$LogPath
 )
 
 $ErrorActionPreference = "Stop"
+$script:CurrentStep = "bootstrap"
+$script:chezmoiExe = $null
+$startedTranscript = $false
 
 function Write-Step {
     param([string]$Message)
+    $script:CurrentStep = $Message
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
@@ -31,70 +36,163 @@ function Ensure-WingetPackage {
     winget install --id $Id --exact --accept-source-agreements --accept-package-agreements
 }
 
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    throw "winget not found. Install App Installer first."
+function Refresh-ProcessPath {
+    $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $user = [Environment]::GetEnvironmentVariable("Path", "User")
+    $combined = @($machine, $user) -join ";"
+    if (-not [string]::IsNullOrWhiteSpace($combined)) {
+        $env:Path = $combined
+    }
 }
 
-if (-not $SkipBaseInstall) {
-    Write-Step "Installing base dependencies"
-    $basePackages = @(
-        "twpayne.chezmoi",
-        "Git.Git",
-        "Microsoft.PowerShell",
-        "GitHub.cli"
+function Resolve-Chezmoi {
+    $cmd = Get-Command chezmoi -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+
+    Refresh-ProcessPath
+    $cmd = Get-Command chezmoi -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+
+    $candidateRoots = @(
+        "$env:LOCALAPPDATA\Microsoft\WinGet\Packages",
+        "$env:LOCALAPPDATA\Programs"
+    ) | Where-Object { Test-Path $_ }
+
+    foreach ($root in $candidateRoots) {
+        $hit = Get-ChildItem -Path $root -Filter "chezmoi.exe" -File -Recurse -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+        if ($hit) { return $hit.FullName }
+    }
+
+    return $null
+}
+
+function Invoke-Step {
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [Parameter(Mandatory)][scriptblock]$Action
     )
 
-    foreach ($pkg in $basePackages) {
-        Ensure-WingetPackage -Id $pkg
-    }
+    Write-Step $Name
+    & $Action
 }
 
-if (-not (Get-Command chezmoi -ErrorAction SilentlyContinue)) {
-    throw "chezmoi not found in PATH after install."
+if (-not $LogPath) {
+    $LogPath = Join-Path $env:TEMP ("windots-install-{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
 
-Write-Step "Applying repository via chezmoi ($Repo)"
-chezmoi init --apply $Repo
-
-$sourcePath = chezmoi source-path
-if (-not (Test-Path $sourcePath)) {
-    throw "Unable to resolve chezmoi source-path."
+try {
+    Start-Transcript -Path $LogPath -Force | Out-Null
+    $startedTranscript = $true
+}
+catch {
+    Write-Warning "Could not start transcript log: $($_.Exception.Message)"
 }
 
-$bootstrapPath = Join-Path $sourcePath "scripts\bootstrap.ps1"
-$validatePath = Join-Path $sourcePath "scripts\validate.ps1"
-$migratePath = Join-Path $sourcePath "scripts\migrate-secrets.ps1"
-$secretsDepsPath = Join-Path $sourcePath "scripts\check-secrets-deps.ps1"
-$linkAiPath = Join-Path $sourcePath "scripts\link-ai-configs.ps1"
-
-if (-not (Test-Path $bootstrapPath)) { throw "Bootstrap script not found: $bootstrapPath" }
-if (-not (Test-Path $validatePath)) { throw "Validate script not found: $validatePath" }
-
-Write-Step "Running bootstrap ($Mode)"
-$bootstrapArgs = @("-Mode", $Mode)
-if ($SkipBaseInstall) { $bootstrapArgs += "-SkipInstall" }
-& $bootstrapPath @bootstrapArgs
-
-if ($UseSymlinkAI -and (Test-Path $linkAiPath)) {
-    Write-Step "Relinking AI config with symlinks"
-    & $linkAiPath -UseSymlink
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    throw "winget not found. Install App Installer first. Log: $LogPath"
 }
 
-Write-Step "Running repository validation"
-& $validatePath
+try {
+    if (-not $SkipBaseInstall) {
+        Invoke-Step -Name "Installing base dependencies" -Action {
+            $basePackages = @(
+                "twpayne.chezmoi",
+                "Git.Git",
+                "Microsoft.PowerShell",
+                "GitHub.cli"
+            )
 
-if (-not $SkipSecretsChecks) {
-    if (Test-Path $migratePath) {
-        Write-Step "Running legacy secret migration checks"
-        & $migratePath
+            foreach ($pkg in $basePackages) {
+                Ensure-WingetPackage -Id $pkg
+            }
+        }
     }
 
-    if (Test-Path $secretsDepsPath) {
-        Write-Step "Running secrets dependency checks"
-        & $secretsDepsPath
+    Invoke-Step -Name "Resolving chezmoi executable" -Action {
+        $script:chezmoiExe = Resolve-Chezmoi
+        if (-not $script:chezmoiExe) {
+            throw @"
+chezmoi not found after install.
+Try:
+1) Close and reopen terminal
+2) Run: winget list --id twpayne.chezmoi
+3) Re-run this installer command
+Log: $LogPath
+"@
+        }
+        Write-Host "    using chezmoi: $script:chezmoiExe" -ForegroundColor DarkGray
+    }
+
+    Invoke-Step -Name "Applying repository via chezmoi ($Repo)" -Action {
+        & $script:chezmoiExe init --apply $Repo
+    }
+
+    $sourcePath = & $script:chezmoiExe source-path
+    if (-not (Test-Path $sourcePath)) {
+        throw "Unable to resolve chezmoi source-path. Got: $sourcePath"
+    }
+
+    $bootstrapPath = Join-Path $sourcePath "scripts\bootstrap.ps1"
+    $validatePath = Join-Path $sourcePath "scripts\validate.ps1"
+    $migratePath = Join-Path $sourcePath "scripts\migrate-secrets.ps1"
+    $secretsDepsPath = Join-Path $sourcePath "scripts\check-secrets-deps.ps1"
+    $linkAiPath = Join-Path $sourcePath "scripts\link-ai-configs.ps1"
+
+    if (-not (Test-Path $bootstrapPath)) { throw "Bootstrap script not found: $bootstrapPath" }
+    if (-not (Test-Path $validatePath)) { throw "Validate script not found: $validatePath" }
+
+    Invoke-Step -Name "Running bootstrap ($Mode)" -Action {
+        $bootstrapArgs = @("-Mode", $Mode)
+        if ($SkipBaseInstall) { $bootstrapArgs += "-SkipInstall" }
+        & $bootstrapPath @bootstrapArgs
+    }
+
+    if ($UseSymlinkAI -and (Test-Path $linkAiPath)) {
+        Invoke-Step -Name "Relinking AI config with symlinks" -Action {
+            & $linkAiPath -UseSymlink
+        }
+    }
+
+    Invoke-Step -Name "Running repository validation" -Action {
+        & $validatePath
+    }
+
+    if (-not $SkipSecretsChecks) {
+        if (Test-Path $migratePath) {
+            Invoke-Step -Name "Running legacy secret migration checks" -Action {
+                & $migratePath
+            }
+        }
+
+        if (Test-Path $secretsDepsPath) {
+            Invoke-Step -Name "Running secrets dependency checks" -Action {
+                & $secretsDepsPath
+            }
+        }
+    }
+
+    Write-Host ""
+    Write-Host "Setup completed." -ForegroundColor Green
+    Write-Host "Profile mode commands: pmode / pclean / pfull" -ForegroundColor Green
+    Write-Host "Install log: $LogPath" -ForegroundColor Green
+}
+catch {
+    Write-Host ""
+    Write-Host "Installation failed during step: $script:CurrentStep" -ForegroundColor Red
+    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Log: $LogPath" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Recovery options:" -ForegroundColor Yellow
+    Write-Host "1) Re-run same command (installer is idempotent)." -ForegroundColor Yellow
+    Write-Host "2) Re-run skipping base install:" -ForegroundColor Yellow
+    Write-Host "   & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1'))) -SkipBaseInstall" -ForegroundColor Yellow
+    Write-Host "3) Verify chezmoi manually: winget list --id twpayne.chezmoi" -ForegroundColor Yellow
+    throw
+}
+finally {
+    if ($startedTranscript) {
+        try { Stop-Transcript | Out-Null } catch {}
     }
 }
-
-Write-Host ""
-Write-Host "Setup completed." -ForegroundColor Green
-Write-Host "Profile mode commands: pmode / pclean / pfull" -ForegroundColor Green

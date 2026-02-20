@@ -31,6 +31,12 @@ irm https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1 | iex
 
 Esse comando baixa o `init.ps1`, instala dependências base, aplica o repo com `chezmoi`, executa bootstrap, validação e checks de segredos.
 
+Se falhar por PATH recém-atualizado (ex.: `chezmoi not found`), rode sem reinstalar base:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1"))) -SkipBaseInstall
+```
+
 ## Desenvolvimento local
 
 ```powershell
