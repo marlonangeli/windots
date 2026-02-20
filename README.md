@@ -37,6 +37,8 @@ Se falhar por PATH recém-atualizado (ex.: `chezmoi not found`), rode sem reinst
 & ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1"))) -SkipBaseInstall
 ```
 
+Se ainda falhar, feche e abra um novo terminal e execute o comando acima novamente.
+
 ## Desenvolvimento local
 
 ```powershell

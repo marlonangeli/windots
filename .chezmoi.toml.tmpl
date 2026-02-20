@@ -1,6 +1,6 @@
-{{- $name := promptStringOnce "name" "Git user.name" -}}
-{{- $email := promptStringOnce "email" "Git user.email" -}}
-{{- $github := promptStringOnce "github_username" "GitHub username" -}}
+{{- $name := promptStringOnce "name" "Git user.name" "" -}}
+{{- $email := promptStringOnce "email" "Git user.email" "" -}}
+{{- $github := promptStringOnce "github_username" "GitHub username" "" -}}
 {{- $azureOrg := promptStringOnce "azure_org" "Azure DevOps organization URL (optional)" "" -}}
 {{- $azureProject := promptStringOnce "azure_project" "Azure DevOps default project (optional)" "" -}}
 [data]

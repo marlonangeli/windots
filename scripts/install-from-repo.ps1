@@ -127,9 +127,15 @@ Log: $LogPath
 
     Invoke-Step -Name "Applying repository via chezmoi ($Repo)" -Action {
         & $script:chezmoiExe init --apply $Repo
+        if ($LASTEXITCODE -ne 0) {
+            throw "chezmoi init --apply failed with exit code $LASTEXITCODE"
+        }
     }
 
     $sourcePath = & $script:chezmoiExe source-path
+    if ($LASTEXITCODE -ne 0) {
+        throw "chezmoi source-path failed with exit code $LASTEXITCODE"
+    }
     if (-not (Test-Path $sourcePath)) {
         throw "Unable to resolve chezmoi source-path. Got: $sourcePath"
     }
@@ -144,9 +150,11 @@ Log: $LogPath
     if (-not (Test-Path $validatePath)) { throw "Validate script not found: $validatePath" }
 
     Invoke-Step -Name "Running bootstrap ($Mode)" -Action {
-        $bootstrapArgs = @("-Mode", $Mode)
-        if ($SkipBaseInstall) { $bootstrapArgs += "-SkipInstall" }
-        & $bootstrapPath @bootstrapArgs
+        if ($SkipBaseInstall) {
+            & $bootstrapPath -Mode $Mode -SkipInstall
+        } else {
+            & $bootstrapPath -Mode $Mode
+        }
     }
 
     if ($UseSymlinkAI -and (Test-Path $linkAiPath)) {
@@ -188,7 +196,8 @@ catch {
     Write-Host "1) Re-run same command (installer is idempotent)." -ForegroundColor Yellow
     Write-Host "2) Re-run skipping base install:" -ForegroundColor Yellow
     Write-Host "   & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1'))) -SkipBaseInstall" -ForegroundColor Yellow
-    Write-Host "3) Verify chezmoi manually: winget list --id twpayne.chezmoi" -ForegroundColor Yellow
+    Write-Host "3) Reopen terminal and run option 2 (refreshes PATH in new session)." -ForegroundColor Yellow
+    Write-Host "4) Verify chezmoi manually: winget list --id twpayne.chezmoi" -ForegroundColor Yellow
     throw
 }
 finally {

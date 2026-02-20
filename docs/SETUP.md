@@ -24,6 +24,8 @@ Retry sem reinstalar dependências base:
 & ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1"))) -SkipBaseInstall
 ```
 
+Se necessário, reabra o terminal antes do retry para garantir PATH atualizado.
+
 ## 3) Bootstrap (recomendado)
 
 ```powershell
