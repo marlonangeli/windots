@@ -4,7 +4,8 @@ param(
     [string]$Mode = "full",
     [switch]$SkipBaseInstall,
     [switch]$UseSymlinkAI,
-    [switch]$SkipSecretsChecks
+    [switch]$SkipSecretsChecks,
+    [switch]$AutoApply
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,4 +26,5 @@ if ([string]::IsNullOrWhiteSpace($installer)) {
     -Mode $Mode `
     -SkipBaseInstall:$SkipBaseInstall `
     -UseSymlinkAI:$UseSymlinkAI `
-    -SkipSecretsChecks:$SkipSecretsChecks
+    -SkipSecretsChecks:$SkipSecretsChecks `
+    -AutoApply:$AutoApply

@@ -9,7 +9,8 @@ param(
     [switch]$SkipBaseInstall,
     [switch]$UseSymlinkAI,
     [switch]$SkipSecretsChecks,
-    [string]$LogPath
+    [string]$LogPath,
+    [switch]$AutoApply
 )
 
 $ErrorActionPreference = "Stop"
@@ -125,10 +126,10 @@ Log: $LogPath
         Write-Host "    using chezmoi: $script:chezmoiExe" -ForegroundColor DarkGray
     }
 
-    Invoke-Step -Name "Applying repository via chezmoi ($Repo)" -Action {
-        & $script:chezmoiExe init --apply $Repo
+    Invoke-Step -Name "Initializing repository via chezmoi ($Repo)" -Action {
+        & $script:chezmoiExe init $Repo
         if ($LASTEXITCODE -ne 0) {
-            throw "chezmoi init --apply failed with exit code $LASTEXITCODE"
+            throw "chezmoi init failed with exit code $LASTEXITCODE"
         }
     }
 
@@ -149,42 +150,58 @@ Log: $LogPath
     if (-not (Test-Path $bootstrapPath)) { throw "Bootstrap script not found: $bootstrapPath" }
     if (-not (Test-Path $validatePath)) { throw "Validate script not found: $validatePath" }
 
-    Invoke-Step -Name "Running bootstrap ($Mode)" -Action {
-        if ($SkipBaseInstall) {
-            & $bootstrapPath -Mode $Mode -SkipInstall
-        } else {
-            & $bootstrapPath -Mode $Mode
-        }
-    }
-
-    if ($UseSymlinkAI -and (Test-Path $linkAiPath)) {
-        Invoke-Step -Name "Relinking AI config with symlinks" -Action {
-            & $linkAiPath -UseSymlink
-        }
-    }
-
-    Invoke-Step -Name "Running repository validation" -Action {
-        & $validatePath
-    }
-
-    if (-not $SkipSecretsChecks) {
-        if (Test-Path $migratePath) {
-            Invoke-Step -Name "Running legacy secret migration checks" -Action {
-                & $migratePath
+    if ($AutoApply) {
+        Invoke-Step -Name "Running bootstrap ($Mode)" -Action {
+            if ($SkipBaseInstall) {
+                & $bootstrapPath -Mode $Mode -SkipInstall
+            } else {
+                & $bootstrapPath -Mode $Mode
             }
         }
 
-        if (Test-Path $secretsDepsPath) {
-            Invoke-Step -Name "Running secrets dependency checks" -Action {
-                & $secretsDepsPath
+        if ($UseSymlinkAI -and (Test-Path $linkAiPath)) {
+            Invoke-Step -Name "Relinking AI config with symlinks" -Action {
+                & $linkAiPath -UseSymlink
             }
         }
-    }
+        Invoke-Step -Name "Running repository validation" -Action {
+            & $validatePath
+        }
 
-    Write-Host ""
-    Write-Host "Setup completed." -ForegroundColor Green
-    Write-Host "Profile mode commands: pmode / pclean / pfull" -ForegroundColor Green
-    Write-Host "Install log: $LogPath" -ForegroundColor Green
+        if (-not $SkipSecretsChecks) {
+            if (Test-Path $migratePath) {
+                Invoke-Step -Name "Running legacy secret migration checks" -Action {
+                    & $migratePath
+                }
+            }
+
+            if (Test-Path $secretsDepsPath) {
+                Invoke-Step -Name "Running secrets dependency checks" -Action {
+                    & $secretsDepsPath
+                }
+            }
+        }
+
+        Write-Host ""
+        Write-Host "Setup completed." -ForegroundColor Green
+        Write-Host "Profile mode commands: pmode / pclean / pfull" -ForegroundColor Green
+        Write-Host "Install log: $LogPath" -ForegroundColor Green
+    }
+    else {
+        Write-Host ""
+        Write-Host "Repository initialized only (manual apply mode)." -ForegroundColor Green
+        Write-Host "Next commands:" -ForegroundColor Yellow
+        Write-Host "1) & '$script:chezmoiExe' apply" -ForegroundColor Yellow
+        Write-Host "2) pwsh '$bootstrapPath' -Mode $Mode" -ForegroundColor Yellow
+        Write-Host "3) pwsh '$validatePath'" -ForegroundColor Yellow
+        if (-not $SkipSecretsChecks) {
+            Write-Host "4) pwsh '$migratePath'" -ForegroundColor Yellow
+            if (Test-Path $secretsDepsPath) {
+                Write-Host "5) pwsh '$secretsDepsPath'" -ForegroundColor Yellow
+            }
+        }
+        Write-Host "Install log: $LogPath" -ForegroundColor Green
+    }
 }
 catch {
     Write-Host ""

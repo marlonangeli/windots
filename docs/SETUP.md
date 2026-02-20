@@ -18,6 +18,13 @@ Alternativa em comando único (remote install script):
 irm https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1 | iex
 ```
 
+Por padrão esse comando só inicializa/clona o source do `chezmoi` e exibe os próximos passos para execução manual.
+Se quiser fluxo automático completo:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1"))) -AutoApply
+```
+
 Retry sem reinstalar dependências base:
 
 ```powershell

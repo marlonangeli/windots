@@ -39,6 +39,13 @@ Se falhar por PATH recém-atualizado (ex.: `chezmoi not found`), rode sem reinst
 
 Se ainda falhar, feche e abra um novo terminal e execute o comando acima novamente.
 
+Por padrão, o `init.ps1` apenas inicializa/clona o source do `chezmoi` e mostra os próximos comandos para você rodar manualmente (`chezmoi apply`, bootstrap e validação).  
+Para modo totalmente automático, use:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1"))) -AutoApply
+```
+
 ## Desenvolvimento local
 
 ```powershell
