@@ -79,6 +79,36 @@ function Invoke-Step {
     & $Action
 }
 
+function Get-RepoRemotePattern {
+    param([Parameter(Mandatory)][string]$RepoName)
+    return "(github\.com[:/]" + [regex]::Escape($RepoName) + "(\.git)?$)"
+}
+
+function Resolve-ExistingSource {
+    param(
+        [Parameter(Mandatory)][string]$Chez,
+        [Parameter(Mandatory)][string]$RepoName
+    )
+
+    $sourcePath = & $Chez source-path 2>$null
+    if ($LASTEXITCODE -ne 0 -or -not $sourcePath -or -not (Test-Path $sourcePath)) {
+        return $null
+    }
+
+    $remote = & $Chez git remote get-url origin 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return $null
+    }
+
+    $pattern = Get-RepoRemotePattern -RepoName $RepoName
+    if ($remote -match $pattern) {
+        Write-Host "    existing chezmoi source detected and matches repo: $remote" -ForegroundColor DarkGray
+        return $sourcePath
+    }
+
+    throw "Existing chezmoi source points to a different remote: $remote"
+}
+
 if (-not $LogPath) {
     $LogPath = Join-Path $env:TEMP ("windots-install-{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
@@ -126,16 +156,27 @@ Log: $LogPath
         Write-Host "    using chezmoi: $script:chezmoiExe" -ForegroundColor DarkGray
     }
 
+    $sourcePath = $null
     Invoke-Step -Name "Initializing repository via chezmoi ($Repo)" -Action {
-        & $script:chezmoiExe init $Repo
-        if ($LASTEXITCODE -ne 0) {
+        $initOutput = & $script:chezmoiExe init $Repo 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            return
+        }
+
+        Write-Host "    chezmoi init output:" -ForegroundColor Yellow
+        $initOutput | ForEach-Object { Write-Host "    $_" -ForegroundColor Yellow }
+
+        $sourcePath = Resolve-ExistingSource -Chez $script:chezmoiExe -RepoName $Repo
+        if (-not $sourcePath) {
             throw "chezmoi init failed with exit code $LASTEXITCODE"
         }
     }
 
-    $sourcePath = & $script:chezmoiExe source-path
-    if ($LASTEXITCODE -ne 0) {
-        throw "chezmoi source-path failed with exit code $LASTEXITCODE"
+    if (-not $sourcePath) {
+        $sourcePath = & $script:chezmoiExe source-path
+        if ($LASTEXITCODE -ne 0) {
+            throw "chezmoi source-path failed with exit code $LASTEXITCODE"
+        }
     }
     if (-not (Test-Path $sourcePath)) {
         throw "Unable to resolve chezmoi source-path. Got: $sourcePath"
