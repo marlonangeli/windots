@@ -19,7 +19,7 @@ if ($Mode -eq "full") {
         "Docker.DockerDesktop",
         "Microsoft.VisualStudioCode",
         "ZedIndustries.Zed",
-        "JetBrains.JetBrainsMonoNerdFont"
+        "DEVCOM.JetBrainsMonoNerdFont"
     )
 }
 

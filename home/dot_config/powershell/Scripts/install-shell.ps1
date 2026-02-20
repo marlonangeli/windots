@@ -130,7 +130,7 @@ $optional = @(
     @{ Id = "Oven-sh.Bun"; Command = "bun" },
     @{ Id = "Yarn.Yarn"; Command = "yarn" },
     @{ Id = "pnpm.pnpm"; Command = "pnpm" },
-    @{ Id = "JetBrains.JetBrainsMonoNerdFont"; Command = $null }
+    @{ Id = "DEVCOM.JetBrainsMonoNerdFont"; Command = $null }
 )
 
 Write-Step "Installing core tooling"

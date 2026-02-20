@@ -1,15 +1,106 @@
 {
+  "$help": "https://aka.ms/terminal-documentation",
   "$schema": "https://aka.ms/terminal-profiles-schema",
+  "actions": [
+    {
+      "id": "Windots.CopilotShell",
+      "name": "GitHub Copilot Suggest (Shell)",
+      "command": {
+        "action": "newTab",
+        "commandline": "pwsh.exe -NoExit -Command \"gh copilot suggest -t shell\"",
+        "startingDirectory": "%USERPROFILE%"
+      }
+    },
+    {
+      "id": "Windots.CodexCli",
+      "name": "Open Codex CLI",
+      "command": {
+        "action": "newTab",
+        "commandline": "pwsh.exe -NoExit -Command \"codex\"",
+        "startingDirectory": "%USERPROFILE%"
+      }
+    }
+  ],
+  "alwaysShowTabs": true,
+  "copyFormatting": "none",
+  "copyOnSelect": false,
   "defaultProfile": "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
-  "theme": "{{ .terminal_scheme }}",
+  "keybindings": [
+    {
+      "id": "Terminal.CopyToClipboard",
+      "keys": "ctrl+c"
+    },
+    {
+      "id": "Terminal.PasteFromClipboard",
+      "keys": "ctrl+v"
+    },
+    {
+      "id": "Terminal.DuplicatePaneAuto",
+      "keys": "alt+shift+d"
+    },
+    {
+      "command": "newTab",
+      "keys": "ctrl+shift+t"
+    },
+    {
+      "command": "commandPalette",
+      "keys": "ctrl+shift+p"
+    },
+    {
+      "command": "find",
+      "keys": "ctrl+shift+f"
+    },
+    {
+      "command": {
+        "action": "splitPane",
+        "split": "vertical",
+        "splitMode": "duplicate"
+      },
+      "keys": "alt+shift+v"
+    },
+    {
+      "command": {
+        "action": "splitPane",
+        "split": "horizontal",
+        "splitMode": "duplicate"
+      },
+      "keys": "alt+shift+h"
+    },
+    {
+      "command": "quakeMode",
+      "keys": "win+`"
+    },
+    {
+      "id": "Windots.CopilotShell",
+      "keys": "ctrl+alt+g"
+    },
+    {
+      "id": "Windots.CodexCli",
+      "keys": "ctrl+alt+x"
+    }
+  ],
+  "launchMode": "maximized",
+  "newTabMenu": [
+    {
+      "type": "remainingProfiles"
+    }
+  ],
   "profiles": {
     "defaults": {
+      "antialiasingMode": "cleartype",
+      "bellStyle": "none",
       "colorScheme": "{{ .terminal_scheme }}",
-      "font": {
-        "face": "{{ .terminal_font }}"
-      },
       "cursorShape": "bar",
-      "padding": "10,15"
+      "font": {
+        "face": "{{ .terminal_font }}",
+        "size": 11
+      },
+      "historySize": 100000,
+      "opacity": 92,
+      "padding": "10,15",
+      "snapOnInput": true,
+      "startingDirectory": "%USERPROFILE%",
+      "useAcrylic": true
     },
     "list": [
       {
@@ -19,5 +110,56 @@
         "commandline": "pwsh.exe -NoLogo"
       }
     ]
-  }
+  },
+  "schemes": [
+    {
+      "name": "Catppuccin Mocha",
+      "background": "#1E1E2E",
+      "foreground": "#CDD6F4",
+      "black": "#45475A",
+      "blue": "#89B4FA",
+      "brightBlack": "#585B70",
+      "brightBlue": "#89B4FA",
+      "brightCyan": "#94E2D5",
+      "brightGreen": "#A6E3A1",
+      "brightPurple": "#F5C2E7",
+      "brightRed": "#F38BA8",
+      "brightWhite": "#A6ADC8",
+      "brightYellow": "#F9E2AF",
+      "cursorColor": "#F5E0DC",
+      "cyan": "#94E2D5",
+      "green": "#A6E3A1",
+      "purple": "#F5C2E7",
+      "red": "#F38BA8",
+      "selectionBackground": "#585B70",
+      "white": "#BAC2DE",
+      "yellow": "#F9E2AF"
+    },
+    {
+      "name": "Catppuccin Latte",
+      "background": "#EFF1F5",
+      "foreground": "#4C4F69",
+      "black": "#5C5F77",
+      "blue": "#1E66F5",
+      "brightBlack": "#6C6F85",
+      "brightBlue": "#1E66F5",
+      "brightCyan": "#179299",
+      "brightGreen": "#40A02B",
+      "brightPurple": "#EA76CB",
+      "brightRed": "#D20F39",
+      "brightWhite": "#BCC0CC",
+      "brightYellow": "#DF8E1D",
+      "cursorColor": "#DC8A78",
+      "cyan": "#179299",
+      "green": "#40A02B",
+      "purple": "#EA76CB",
+      "red": "#D20F39",
+      "selectionBackground": "#DCE0E8",
+      "white": "#ACB0BE",
+      "yellow": "#DF8E1D"
+    }
+  ],
+  "tabWidthMode": "equal",
+  "theme": "system",
+  "windowingBehavior": "useExisting"
 }
