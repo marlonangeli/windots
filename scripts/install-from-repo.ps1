@@ -149,6 +149,20 @@ function Resolve-ExistingSource {
     throw "Existing chezmoi source points to a different remote: $remote"
 }
 
+function Resolve-RepoScriptPath {
+    param(
+        [Parameter(Mandatory)][string]$SourcePath,
+        [Parameter(Mandatory)][string]$RelativePath
+    )
+
+    $candidates = @(
+        (Join-Path $SourcePath $RelativePath),
+        (Join-Path (Join-Path $SourcePath "home") $RelativePath)
+    )
+
+    return $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+
 if (-not $LogPath) {
     $LogPath = Join-Path $env:TEMP ("windots-install-{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
@@ -224,14 +238,14 @@ Log: $LogPath
         throw "Unable to resolve chezmoi source-path. Got: $sourcePath"
     }
 
-    $bootstrapPath = Join-Path $sourcePath "scripts\bootstrap.ps1"
-    $validatePath = Join-Path $sourcePath "scripts\validate.ps1"
-    $migratePath = Join-Path $sourcePath "scripts\migrate-secrets.ps1"
-    $secretsDepsPath = Join-Path $sourcePath "scripts\check-secrets-deps.ps1"
-    $linkAiPath = Join-Path $sourcePath "scripts\link-ai-configs.ps1"
+    $bootstrapPath = Resolve-RepoScriptPath -SourcePath $sourcePath -RelativePath "scripts\bootstrap.ps1"
+    $validatePath = Resolve-RepoScriptPath -SourcePath $sourcePath -RelativePath "scripts\validate.ps1"
+    $migratePath = Resolve-RepoScriptPath -SourcePath $sourcePath -RelativePath "scripts\migrate-secrets.ps1"
+    $secretsDepsPath = Resolve-RepoScriptPath -SourcePath $sourcePath -RelativePath "scripts\check-secrets-deps.ps1"
+    $linkAiPath = Resolve-RepoScriptPath -SourcePath $sourcePath -RelativePath "scripts\link-ai-configs.ps1"
 
-    if (-not (Test-Path $bootstrapPath)) { throw "Bootstrap script not found: $bootstrapPath" }
-    if (-not (Test-Path $validatePath)) { throw "Validate script not found: $validatePath" }
+    if (-not $bootstrapPath) { throw "Bootstrap script not found under source path: $sourcePath" }
+    if (-not $validatePath) { throw "Validate script not found under source path: $sourcePath" }
 
     if ($AutoApply) {
         Invoke-Step -Name "Running bootstrap ($Mode)" -Action {

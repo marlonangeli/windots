@@ -23,6 +23,9 @@ pwsh ./scripts/bootstrap.ps1 -Mode full
 pwsh ./scripts/validate.ps1
 ```
 
+> Se quiser pular instalação/validação de toolchain `mise` no bootstrap:
+> `pwsh ./scripts/bootstrap.ps1 -Mode full -SkipMise`
+
 ### One-command installer (remote)
 
 ```powershell

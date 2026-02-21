@@ -45,6 +45,7 @@ pwsh ./scripts/bootstrap.ps1 -Mode full
 Notas:
 - `-Mode clean` reduz instalação para cenário mais enxuto.
 - `-SkipInstall` aplica configs sem reinstalar ferramentas.
+- `-SkipMise` aplica bootstrap sem `mise install/doctor/ls`.
 - O bootstrap instala um `profile shim` no caminho oficial do PowerShell (mesmo em OneDrive Documents), redirecionando para `~/.config/powershell`.
 - Se já existir profile, o script pede confirmação e salva backup antes de substituir.
 - Para restaurar profile anterior: `pwsh ./scripts/install-profile-shim.ps1 -Action reset`.

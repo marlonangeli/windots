@@ -2,7 +2,8 @@
 param(
     [ValidateSet("full","clean")]
     [string]$Mode = "full",
-    [switch]$SkipInstall
+    [switch]$SkipInstall,
+    [switch]$SkipMise
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,7 +28,7 @@ Write-Host "Installing PowerShell profile shim..." -ForegroundColor Cyan
 Write-Host "Configuring oh-my-posh themes and fonts..." -ForegroundColor Cyan
 & "$PSScriptRoot\setup-oh-my-posh.ps1"
 
-if (Get-Command mise -ErrorAction SilentlyContinue) {
+if (-not $SkipMise -and (Get-Command mise -ErrorAction SilentlyContinue)) {
     Write-Host "Configuring mise PATH and activation..." -ForegroundColor Cyan
     & "$PSScriptRoot\setup-mise.ps1"
 
