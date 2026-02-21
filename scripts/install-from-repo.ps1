@@ -155,9 +155,11 @@ function Resolve-RepoScriptPath {
         [Parameter(Mandatory)][string]$RelativePath
     )
 
+    $sourceParent = Split-Path -Parent $SourcePath
     $candidates = @(
         (Join-Path $SourcePath $RelativePath),
-        (Join-Path (Join-Path $SourcePath "home") $RelativePath)
+        (Join-Path (Join-Path $SourcePath "home") $RelativePath),
+        (Join-Path $sourceParent $RelativePath)
     )
 
     return $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
