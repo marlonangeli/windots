@@ -31,12 +31,15 @@ function Install-WingetPackage {
     }
 }
 
+# TODO: melhorar a definição dos pacotes, utilizando uma estrutura mais rica, permitindo categorizar e adicionar metadados como "opcional", "recomendada", "categoria", etc. Isso facilitaria a manutenção e a extensão da lista de pacotes no futuro.
 $packages = @(
     "Microsoft.PowerShell",
     "Microsoft.WindowsTerminal",
     "Git.Git",
     "Microsoft.AzureCLI",
-    "jdx.mise"
+    "jdx.mise",
+    "JanDeDobbeleer.OhMyPosh",
+    "charmbracelet.gum"
 )
 
 if ($Mode -eq "full") {
@@ -54,6 +57,6 @@ if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
 }
 
 foreach ($id in $packages) {
-    $optional = $id -in @("DEVCOM.JetBrainsMonoNerdFont", "GitHub.Copilot")
+    $optional = $id -in @("DEVCOM.JetBrainsMonoNerdFont", "GitHub.Copilot", "charmbracelet.gum")
     Install-WingetPackage -Id $id -Optional:$optional
 }

@@ -1,0 +1,14 @@
+<Configuration>
+  <VGpu>Disable</VGpu>
+  <Networking>Enable</Networking>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\\windots</HostFolder>
+      <SandboxFolder>C:\\Users\\WDAGUtilityAccount\\Desktop\\windots</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>pwsh -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\WDAGUtilityAccount\\Desktop\\windots\\tests\\sandbox\\run-bootstrap.ps1</Command>
+  </LogonCommand>
+</Configuration>

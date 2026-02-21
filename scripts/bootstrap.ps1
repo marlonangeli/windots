@@ -1,50 +1,43 @@
+# TODO: simplificar os parametros, utilizar enums de estados para skip e include, verificar a necessidade de todos os parametros, adicionar documentação e exemplos de uso
 [CmdletBinding()]
 param(
-    [ValidateSet("full","clean")]
+    [ValidateSet("full", "clean")]
     [string]$Mode = "full",
+
     [switch]$SkipInstall,
-    [switch]$SkipMise
+    [switch]$SkipMise,
+    [switch]$UseSymlinkAI,
+    [switch]$SkipSecretsChecks,
+    [switch]$IncludeSecretsChecks,
+    [switch]$NoPrompt,
+    [string[]]$Modules,
+    [switch]$WhatIf
 )
 
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "common\logging.ps1")
 
-Log-Step "Applying chezmoi changes..."
-if (Get-Command chezmoi -ErrorAction SilentlyContinue) {
-    chezmoi apply
-} else {
-    Log-Warn "chezmoi not found. Install it first."
+$runnerPath = Join-Path $PSScriptRoot "run-modules.ps1"
+if (-not (Test-Path $runnerPath)) {
+    throw "run-modules script not found: $runnerPath"
 }
 
-if (-not $SkipInstall) {
-    & "$PSScriptRoot\install-tools.ps1" -Mode $Mode
+$runnerArgs = @{
+    Mode = $Mode
+    SkipInstall = [bool]$SkipInstall
+    SkipMise = [bool]$SkipMise
+    UseSymlinkAI = [bool]$UseSymlinkAI
+    SkipSecretsChecks = [bool]$SkipSecretsChecks
+    IncludeSecretsChecks = [bool]$IncludeSecretsChecks
+    NoPrompt = [bool]$NoPrompt
+    WhatIf = [bool]$WhatIf
 }
 
-Log-Step "Linking AI config..."
-& "$PSScriptRoot\link-ai-configs.ps1"
-
-Log-Step "Installing PowerShell profile shim..."
-& "$PSScriptRoot\install-profile-shim.ps1"
-
-Log-Step "Configuring oh-my-posh themes and fonts..."
-& "$PSScriptRoot\setup-oh-my-posh.ps1"
-
-if (-not $SkipMise -and (Get-Command mise -ErrorAction SilentlyContinue)) {
-    Log-Step "Configuring mise PATH and activation..."
-    & "$PSScriptRoot\setup-mise.ps1"
-
-    $miseConfig = Join-Path $HOME ".config\mise\config.toml"
-    if (Test-Path $miseConfig) {
-        Log-Step "Installing mise toolchain..."
-        mise install
-        if ($LASTEXITCODE -ne 0) { throw "mise install failed" }
-        mise doctor
-        if ($LASTEXITCODE -ne 0) { Log-Warn "mise doctor reported issues. Review output above." }
-        mise ls
-    } else {
-        Log-Warn "mise config not found: $miseConfig"
-    }
+if ($Modules -and $Modules.Count -gt 0) {
+    $runnerArgs.Modules = $Modules
 }
+
+& $runnerPath @runnerArgs
 
 Log-Info "Bootstrap complete."
