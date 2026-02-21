@@ -2,31 +2,29 @@
 param(
     [ValidateSet("full", "clean")]
     [string]$Mode = "full",
+
     [switch]$SkipBaseInstall,
     [switch]$UseSymlinkAI,
     [switch]$SkipSecretsChecks,
     [switch]$AutoApply,
-    [switch]$NoPrompt
+    [switch]$NoPrompt,
+    [string[]]$Modules,
+
+    [string]$Repo = "marlonangeli/windots",
+    [string]$Branch = "main",
+    [string]$Ref,
+    [string]$Host = "raw.githubusercontent.com",
+    [switch]$RequireNonMain,
+    [string]$LocalRepoPath
 )
 
 $ErrorActionPreference = "Stop"
 
-$repo = "marlonangeli/windots"
-$installerUrl = "https://raw.githubusercontent.com/$repo/main/scripts/install-from-repo.ps1"
+Write-Warning "init.ps1 is deprecated. Use install.ps1 instead. Delegating to install.ps1..."
 
-Write-Host "Bootstrapping $repo ..." -ForegroundColor Cyan
-Write-Host "Installer: $installerUrl" -ForegroundColor DarkGray
-
-$installer = Invoke-RestMethod -Uri $installerUrl
-if ([string]::IsNullOrWhiteSpace($installer)) {
-    throw "Failed to download installer from $installerUrl"
+$installPath = Join-Path $PSScriptRoot "install.ps1"
+if (-not (Test-Path $installPath)) {
+    throw "install.ps1 not found at repository root."
 }
 
-& ([scriptblock]::Create($installer)) `
-    -Repo $repo `
-    -Mode $Mode `
-    -SkipBaseInstall:$SkipBaseInstall `
-    -UseSymlinkAI:$UseSymlinkAI `
-    -SkipSecretsChecks:$SkipSecretsChecks `
-    -AutoApply:$AutoApply `
-    -NoPrompt:$NoPrompt
+& $installPath @PSBoundParameters
