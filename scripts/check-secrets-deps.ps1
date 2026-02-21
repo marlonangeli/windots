@@ -27,7 +27,7 @@ $jiraMessage = if ($jira) { "installed" } else { "optional, only needed for Jira
 Write-Status -Name "Jira CLI (jira)" -Ok $jira -Message $jiraMessage
 
 $gitignorePath = Join-Path $repoRoot ".gitignore"
-$chezmoiIgnorePath = Join-Path $repoRoot ".chezmoiignore"
+$chezmoiIgnorePath = Join-Path $repoRoot "home\.chezmoiignore"
 
 if (-not (Test-Path $gitignorePath)) {
     Write-Status -Name ".gitignore" -Ok $false -Message "file not found"
@@ -42,12 +42,15 @@ if (-not (Test-Path $gitignorePath)) {
 }
 
 if (-not (Test-Path $chezmoiIgnorePath)) {
-    Write-Status -Name ".chezmoiignore" -Ok $false -Message "file not found"
+    Write-Status -Name "home/.chezmoiignore" -Ok $false -Message "file not found"
 } else {
     $chezIgnore = Get-Content $chezmoiIgnorePath -Raw
     $ok = $chezIgnore -match "home/dot_codex/auth\.json"
+    if (-not $ok) {
+        $ok = $chezIgnore -match "dot_codex/auth\.json"
+    }
     $chezMessage = if ($ok) { "codex auth ignored in source import" } else { "missing codex auth ignore rule" }
-    Write-Status -Name ".chezmoiignore codex auth" -Ok $ok -Message $chezMessage
+    Write-Status -Name "home/.chezmoiignore codex auth" -Ok $ok -Message $chezMessage
 }
 
 $jiraCfg = Join-Path $repoRoot "home\dot_config\jira\.config.yml.tmpl"

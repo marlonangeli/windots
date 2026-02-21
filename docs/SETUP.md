@@ -77,7 +77,7 @@ Após `chezmoi apply`/`chezmoi update`, um hook pós-execução replica automati
 
 - origem: `~/.config/windows-terminal/settings.json`
 - destino: `~/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`
-- implementação: `.chezmoiscripts/run_after_40-sync-windows-terminal.ps1.tmpl`
+- implementação: `home/.chezmoiscripts/run_after_40-sync-windows-terminal.ps1.tmpl`
 
 ## Oh My Posh (tema + fonte)
 

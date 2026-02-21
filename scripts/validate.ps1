@@ -8,7 +8,9 @@ Write-Host "Running validation..." -ForegroundColor Cyan
 # 1) Basic files
 $required = @(
     "README.md",
-    ".chezmoi.toml.tmpl",
+    ".chezmoiroot",
+    "home/.chezmoi.toml.tmpl",
+    "home/.chezmoiignore",
     "home/dot_gitconfig.tmpl",
     "home/dot_codex/config.toml.tmpl"
 )

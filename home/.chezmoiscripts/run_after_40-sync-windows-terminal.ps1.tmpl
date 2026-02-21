@@ -4,11 +4,15 @@ param()
 $ErrorActionPreference = "Stop"
 
 $homeDir = [Environment]::GetFolderPath("UserProfile")
-$source = Join-Path $homeDir ".config\windows-terminal\settings.json"
+$sources = @(
+    (Join-Path $homeDir ".config\windows-terminal\settings.json"),
+    (Join-Path $homeDir "home\.config\windows-terminal\settings.json")
+)
+$source = $sources | Where-Object { Test-Path $_ } | Select-Object -First 1
 $packagesRoot = Join-Path $homeDir "AppData\Local\Packages"
 
-if (-not (Test-Path $source)) {
-    Write-Host "[wt-sync] source not found: $source" -ForegroundColor Yellow
+if (-not $source) {
+    Write-Host "[wt-sync] source not found. Checked: $($sources -join ', ')" -ForegroundColor Yellow
     exit 0
 }
 
@@ -50,4 +54,4 @@ if ($sourceHash -eq $targetHash) {
 }
 
 Copy-Item -Path $source -Destination $target -Force
-Write-Host "[wt-sync] synced: $target" -ForegroundColor Green
+Write-Host "[wt-sync] synced: $target (from $source)" -ForegroundColor Green

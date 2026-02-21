@@ -71,7 +71,7 @@ pwsh ./scripts/validate.ps1
 
 ## Pós-Update automático
 
-- `chezmoi update` já executa um hook em `.chezmoiscripts/run_after_*` que replica `~/.config/windows-terminal/settings.json`
+- `chezmoi update` já executa um hook em `home/.chezmoiscripts/run_after_*` que replica `~/.config/windows-terminal/settings.json`
   para `~/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`.
 - Isso garante que o template em `home/dot_config/windows-terminal/settings.json.tmpl` seja refletido no Windows Terminal Stable.
 

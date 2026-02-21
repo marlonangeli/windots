@@ -12,7 +12,9 @@ $ErrorActionPreference = "Stop"
 $targetProfile = $PROFILE.CurrentUserCurrentHost
 $targetDir = Split-Path -Parent $targetProfile
 $sourceRoot = Join-Path $HOME ".config\powershell"
+$legacySourceRoot = Join-Path $HOME "home\.config\powershell"
 $sourceProfile = Join-Path $sourceRoot "Microsoft.PowerShell_profile.ps1"
+$legacySourceProfile = Join-Path $legacySourceRoot "Microsoft.PowerShell_profile.ps1"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $repoProfileRoot = Join-Path $repoRoot "home\dot_config\powershell"
 $backupRoot = Join-Path $sourceRoot "profile-backups"
@@ -26,6 +28,14 @@ function Ensure-BaseFolders {
 }
 
 function Bootstrap-SourceProfile {
+    if (-not (Test-Path $sourceProfile) -and (Test-Path $legacySourceProfile)) {
+        if (-not (Test-Path $sourceRoot)) {
+            New-Item -ItemType Directory -Path $sourceRoot -Force | Out-Null
+        }
+        Copy-Item -Path (Join-Path $legacySourceRoot "*") -Destination $sourceRoot -Recurse -Force
+        Write-Host "Migrated legacy home/.config/powershell to ~/.config/powershell." -ForegroundColor Yellow
+    }
+
     if (-not (Test-Path $sourceProfile) -and (Test-Path $repoProfileRoot)) {
         Copy-Item -Path (Join-Path $repoProfileRoot "*") -Destination $sourceRoot -Recurse -Force
         Write-Host "Bootstrapped ~/.config/powershell from repository template." -ForegroundColor Yellow
