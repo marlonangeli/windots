@@ -1,3 +1,4 @@
+# TODO: definir valores padrao em arquivo de manifesto
 [CmdletBinding()]
 param(
     [string]$ThemeName = "catppuccin_mocha.omp.json",
@@ -72,3 +73,5 @@ if (-not $fontInstalled) {
 
 Log-Info "oh-my-posh ready. Theme path: $themePath"
 Log-Info "If font was newly installed, restart Windows Terminal to apply font cache updates."
+
+# TODO: ensure that oh-my-posh is configured in PROFILE, and that the theme is applied.

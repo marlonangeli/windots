@@ -1,3 +1,4 @@
+# TODO: abranger melhor o processo de migração, permitindo configurar o que quer ser migrado, adicionar opções de backup, documentação e exemplos de uso
 [CmdletBinding()]
 param()
 
