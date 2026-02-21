@@ -23,6 +23,7 @@ pwsh ./scripts/export-current.ps1
 
 ```powershell
 pwsh ./scripts/validate.ps1
+pwsh ./scripts/validate-modules.ps1
 ```
 
 ## Migração de segredos legados

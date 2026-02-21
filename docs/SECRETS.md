@@ -6,6 +6,7 @@
 - Usar Bitwarden CLI (`bw`) para recuperação em runtime quando aplicável.
 - Manter overrides locais privados como `.local.*`.
 - Validar sempre antes de commit: `pwsh ./scripts/validate.ps1`.
+- Em mudanças na orquestração de módulos, validar também: `pwsh ./scripts/validate-modules.ps1`.
 
 ## Itens sensíveis comuns
 
@@ -26,6 +27,7 @@
 ## Referências
 
 - [Validação automática](../scripts/validate.ps1)
+- [Validação de módulos](../scripts/validate-modules.ps1)
 - [Migração de segredos](../scripts/migrate-secrets.ps1)
 - [Dependências de segredos](../scripts/check-secrets-deps.ps1)
 - [Gitignore do repositório](../.gitignore)
