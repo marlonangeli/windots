@@ -13,7 +13,7 @@ param(
     [string]$Repo = "marlonangeli/windots",
     [string]$Branch = "main",
     [string]$Ref,
-    [string]$Host = "raw.githubusercontent.com",
+    [string]$RawHost = "raw.githubusercontent.com",
     [switch]$RequireNonMain,
     [string]$LocalRepoPath
 )
@@ -56,7 +56,7 @@ if (-not [string]::IsNullOrWhiteSpace($LocalRepoPath)) {
 }
 
 $selectedRef = if ([string]::IsNullOrWhiteSpace($Ref)) { $Branch } else { $Ref }
-$baseUrl = "https://$Host/$Repo/$selectedRef"
+$baseUrl = "https://$RawHost/$Repo/$selectedRef"
 $installerUrl = "$baseUrl/scripts/install.ps1"
 
 Write-Host "Bootstrapping $Repo ..." -ForegroundColor Cyan

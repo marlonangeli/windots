@@ -39,7 +39,6 @@ if (-not $SkipLint) {
 
         $targets = @(
             (Join-Path $repoRoot "install.ps1"),
-            (Join-Path $repoRoot "init.ps1"),
             (Join-Path $repoRoot "scripts"),
             (Join-Path $repoRoot "tests")
         )

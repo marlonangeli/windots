@@ -11,7 +11,6 @@
 ## Contratos estáveis
 
 - `install.ps1` é o entrypoint remoto canônico e delega para `scripts/install.ps1`.
-- `init.ps1` permanece como shim de compatibilidade (deprecado).
 - `scripts/bootstrap.ps1` mantém interface principal e delega para `scripts/run-modules.ps1`.
 - `scripts/validate.ps1` continua gate obrigatório local/CI.
 
