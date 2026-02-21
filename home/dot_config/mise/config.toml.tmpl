@@ -1,8 +1,21 @@
 [tools]
 node = "lts"
-pnpm = "latest"
 bun = "latest"
+pnpm = "latest"
+python = "3.12"
+go = "latest"
+rust = "stable"
 dotnet = "latest"
+gh = "latest"
+codex = "latest"
+ripgrep = "latest"
+fd = "latest"
+bat = "latest"
+zoxide = "latest"
+starship = "latest"
 
 [settings]
-idiomatic_version_file_enable_tools = ["node", "python", "go", "java", "dotnet"]
+idiomatic_version_file_enable_tools = ["node", "python", "go", "dotnet"]
+
+[tasks.bootstrap]
+run = ["mise install", "mise doctor", "mise ls"]

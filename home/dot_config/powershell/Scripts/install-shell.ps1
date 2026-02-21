@@ -121,15 +121,11 @@ $required = @(
     @{ Id = "Microsoft.VisualStudioCode"; Group = "editors" },
     @{ Id = "ZedIndustries.Zed"; Group = "editors" },
     @{ Id = "JanDeDobbeleer.OhMyPosh"; Group = "shell" },
-    @{ Id = "ajeetdsouza.zoxide"; Group = "shell" },
-    @{ Id = "OpenJS.NodeJS.LTS"; Group = "node" }
+    @{ Id = "jdx.mise"; Group = "shell" }
 )
 
 $optional = @(
-    @{ Id = "jdx.mise"; Command = "mise" },
-    @{ Id = "Oven-sh.Bun"; Command = "bun" },
-    @{ Id = "Yarn.Yarn"; Command = "yarn" },
-    @{ Id = "pnpm.pnpm"; Command = "pnpm" },
+    @{ Id = "GitHub.Copilot"; Command = "github-copilot" },
     @{ Id = "DEVCOM.JetBrainsMonoNerdFont"; Command = $null }
 )
 
@@ -157,8 +153,17 @@ if (Should-InstallGroup -Group "dotnet" -and (Get-Command dotnet -ErrorAction Si
 }
 
 if (Should-InstallGroup -Group "node") {
-    Write-Step "Node package managers (corepack)"
-    Ensure-Corepack
+    Write-Step "Node package managers"
+    if (Get-Command mise -ErrorAction SilentlyContinue) {
+        if ($DryRun) {
+            Write-Host "  - [dry-run] mise install" -ForegroundColor Yellow
+        }
+        else {
+            Invoke-Safe -Description "mise install" -Action { mise install }
+        }
+    } else {
+        Write-Warning "mise not found; skipping node runtime provisioning"
+    }
 }
 
 if (Should-InstallGroup -Group "ai") {
@@ -175,6 +180,17 @@ if (Should-InstallGroup -Group "ai") {
         else {
             Write-Warning "jira CLI not installed (npm unavailable)."
         }
+    }
+}
+
+if (Get-Command mise -ErrorAction SilentlyContinue) {
+    Write-Step "Validating mise toolchain"
+    if ($DryRun) {
+        Write-Host "  - [dry-run] mise doctor; mise ls" -ForegroundColor Yellow
+    }
+    else {
+        Invoke-Safe -Description "mise doctor" -Action { mise doctor }
+        Invoke-Safe -Description "mise ls" -Action { mise ls }
     }
 }
 

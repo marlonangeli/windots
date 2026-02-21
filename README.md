@@ -69,6 +69,28 @@ pwsh ./scripts/validate.ps1
 - `scripts/migrate-secrets.ps1`: checagem de legados (`.jira_access_token`, `tfstoken`)
 - `scripts/check-secrets-deps.ps1`: auditoria de dependências e proteções para segredos
 
+## Pós-Update automático
+
+- `chezmoi update` já executa um hook em `.chezmoiscripts/run_after_*` que replica `~/.config/windows-terminal/settings.json`
+  para `~/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`.
+- Isso garante que o template em `home/dot_config/windows-terminal/settings.json.tmpl` seja refletido no Windows Terminal Stable.
+
+## Toolchain com mise
+
+- `mise` é o gerenciador preferencial para CLIs de desenvolvimento no perfil:
+  - `node`, `bun`, `pnpm`, `python`, `go`, `rust`, `dotnet`
+  - `gh`, `codex`, `ripgrep`, `fd`, `bat`, `zoxide`, `starship`
+- `home/dot_config/mise/config.toml.tmpl` é a fonte declarativa.
+- `bootstrap` roda `mise install`, `mise doctor` e `mise ls`.
+- `GitHub.Copilot` permanece via `winget` (se disponível).
+
+## Oh My Posh
+
+- `bootstrap` executa `scripts/setup-oh-my-posh.ps1` para:
+  - garantir tema `catppuccin_mocha.omp.json` em `$env:POSH_THEMES_PATH`
+  - instalar/garantir Nerd Font JetBrains Mono (fallback via winget)
+- O profile PowerShell usa fallback de `POSH_THEMES_PATH` para `%LOCALAPPDATA%\Programs\oh-my-posh\themes`.
+
 ## Estrutura
 
 ```text

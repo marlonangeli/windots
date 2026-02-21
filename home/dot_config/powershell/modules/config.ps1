@@ -54,6 +54,10 @@ function Enable-PoshPrompt {
     if ($global:__PoshInitialized) { return }
     if (-not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) { return }
 
+    if ([string]::IsNullOrWhiteSpace($env:POSH_THEMES_PATH)) {
+        $env:POSH_THEMES_PATH = Join-Path $env:LOCALAPPDATA "Programs\oh-my-posh\themes"
+    }
+
     $themeFile = Join-Path $env:POSH_THEMES_PATH "catppuccin_mocha.omp.json"
     if (-not (Test-Path $themeFile)) { return }
 
@@ -74,8 +78,18 @@ if (Test-InteractiveShell -and $global:__PSProfileMode -eq "full") {
 
 # mise (tool version manager) - optional activation
 if (Get-Command mise -ErrorAction SilentlyContinue) {
+    $global:__MiseInitialized = $global:__MiseInitialized -as [bool]
     try {
-        mise activate pwsh | Out-String | Invoke-Expression
+        $miseShims = Join-Path $env:LOCALAPPDATA "mise\shims"
+        if ((Test-Path $miseShims) -and ($env:PATH -notlike "*$miseShims*")) {
+            $env:PATH = "$miseShims;$env:PATH"
+        }
+
+        if (-not $global:__MiseInitialized) {
+            mise activate pwsh | Out-String | Invoke-Expression
+            mise completion powershell | Out-String | Invoke-Expression
+            $global:__MiseInitialized = $true
+        }
     }
     catch {
         Write-Verbose "mise activation failed: $_"

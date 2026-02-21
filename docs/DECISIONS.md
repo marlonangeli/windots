@@ -5,6 +5,7 @@
 - Base: `chezmoi` para templates e aplicação declarativa.
 - Automação: scripts PowerShell em `scripts/` para bootstrap, validação e migração.
 - Perfil shell: modular em `home/dot_config/powershell/modules/`.
+- Toolchain CLI: preferência por `mise` (winget focado em sistema/GUI e exceções).
 
 ## Segurança
 

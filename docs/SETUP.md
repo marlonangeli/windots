@@ -55,13 +55,36 @@ Notas:
 pwsh ./scripts/validate.ps1
 ```
 
-## 5) Sincronizar AI configs manualmente (opcional)
+## 5) Confirmar toolchain mise
+
+```powershell
+mise install
+mise doctor
+mise ls
+```
+
+## 6) Sincronizar AI configs manualmente (opcional)
 
 ```powershell
 pwsh ./scripts/link-ai-configs.ps1
 # ou
 pwsh ./scripts/link-ai-configs.ps1 -UseSymlink
 ```
+
+## Pós-update do Windows Terminal
+
+Após `chezmoi apply`/`chezmoi update`, um hook pós-execução replica automaticamente:
+
+- origem: `~/.config/windows-terminal/settings.json`
+- destino: `~/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`
+- implementação: `.chezmoiscripts/run_after_40-sync-windows-terminal.ps1.tmpl`
+
+## Oh My Posh (tema + fonte)
+
+O bootstrap chama `scripts/setup-oh-my-posh.ps1` para preparar:
+
+- tema `catppuccin_mocha.omp.json` em `POSH_THEMES_PATH`
+- fonte Nerd Font JetBrains Mono (com fallback de instalação)
 
 ## Referências
 

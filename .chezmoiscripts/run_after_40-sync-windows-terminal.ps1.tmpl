@@ -1,0 +1,53 @@
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = "Stop"
+
+$homeDir = [Environment]::GetFolderPath("UserProfile")
+$source = Join-Path $homeDir ".config\windows-terminal\settings.json"
+$packagesRoot = Join-Path $homeDir "AppData\Local\Packages"
+
+if (-not (Test-Path $source)) {
+    Write-Host "[wt-sync] source not found: $source" -ForegroundColor Yellow
+    exit 0
+}
+
+if (-not (Test-Path $packagesRoot)) {
+    Write-Host "[wt-sync] packages folder not found: $packagesRoot" -ForegroundColor Yellow
+    exit 0
+}
+
+$stableDir = Join-Path $packagesRoot "Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState"
+$targetDir = $stableDir
+
+if (-not (Test-Path $targetDir)) {
+    $fallback = Get-ChildItem -Path $packagesRoot -Directory -Filter "Microsoft.WindowsTerminal*" -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path (Join-Path $_.FullName "LocalState") } |
+        Sort-Object Name |
+        Select-Object -First 1
+
+    if ($fallback) {
+        $targetDir = Join-Path $fallback.FullName "LocalState"
+    }
+}
+
+if (-not (Test-Path $targetDir)) {
+    Write-Host "[wt-sync] destination not found (no Windows Terminal package folder)." -ForegroundColor Yellow
+    exit 0
+}
+
+$target = Join-Path $targetDir "settings.json"
+if (-not (Test-Path $targetDir)) {
+    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+}
+
+$sourceHash = (Get-FileHash -Path $source -Algorithm SHA256).Hash
+$targetHash = if (Test-Path $target) { (Get-FileHash -Path $target -Algorithm SHA256).Hash } else { "" }
+
+if ($sourceHash -eq $targetHash) {
+    Write-Host "[wt-sync] unchanged: $target" -ForegroundColor DarkGray
+    exit 0
+}
+
+Copy-Item -Path $source -Destination $target -Force
+Write-Host "[wt-sync] synced: $target" -ForegroundColor Green
