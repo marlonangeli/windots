@@ -3,6 +3,8 @@ param(
     [string]$Output = "./_staging"
 )
 
+. (Join-Path $PSScriptRoot "common\logging.ps1")
+
 $homePath = [Environment]::GetFolderPath("UserProfile")
 $map = @(
     @{ Source = "$homePath\.gitconfig"; Dest = "home/dot_gitconfig.tmpl" },
@@ -17,6 +19,6 @@ foreach ($item in $map) {
         $dir = Split-Path -Parent $dest
         if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
         Copy-Item $item.Source $dest -Force
-        Write-Host "exported: $($item.Source) -> $dest" -ForegroundColor Green
+        Log-Info "exported: $($item.Source) -> $dest"
     }
 }

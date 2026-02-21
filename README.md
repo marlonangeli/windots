@@ -42,6 +42,9 @@ Se falhar por PATH recém-atualizado (ex.: `chezmoi not found`), rode sem reinst
 
 Se ainda falhar, feche e abra um novo terminal e execute o comando acima novamente.
 
+Se aparecer erro de bootstrap script não encontrado, o instalador resolve scripts pelo root esperado:
+`$HOME/.local/share/chezmoi` (mesmo quando `chezmoi source-path` retorna `.../home`).
+
 Por padrão, o `init.ps1` apenas inicializa/clona o source do `chezmoi` e mostra os próximos comandos para você rodar manualmente (`chezmoi apply`, bootstrap e validação).  
 Para modo totalmente automático, use:
 

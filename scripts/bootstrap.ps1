@@ -8,41 +8,43 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "Applying chezmoi changes..." -ForegroundColor Cyan
+. (Join-Path $PSScriptRoot "common\logging.ps1")
+
+Log-Step "Applying chezmoi changes..."
 if (Get-Command chezmoi -ErrorAction SilentlyContinue) {
     chezmoi apply
 } else {
-    Write-Warning "chezmoi not found. Install it first."
+    Log-Warn "chezmoi not found. Install it first."
 }
 
 if (-not $SkipInstall) {
     & "$PSScriptRoot\install-tools.ps1" -Mode $Mode
 }
 
-Write-Host "Linking AI config..." -ForegroundColor Cyan
+Log-Step "Linking AI config..."
 & "$PSScriptRoot\link-ai-configs.ps1"
 
-Write-Host "Installing PowerShell profile shim..." -ForegroundColor Cyan
+Log-Step "Installing PowerShell profile shim..."
 & "$PSScriptRoot\install-profile-shim.ps1"
 
-Write-Host "Configuring oh-my-posh themes and fonts..." -ForegroundColor Cyan
+Log-Step "Configuring oh-my-posh themes and fonts..."
 & "$PSScriptRoot\setup-oh-my-posh.ps1"
 
 if (-not $SkipMise -and (Get-Command mise -ErrorAction SilentlyContinue)) {
-    Write-Host "Configuring mise PATH and activation..." -ForegroundColor Cyan
+    Log-Step "Configuring mise PATH and activation..."
     & "$PSScriptRoot\setup-mise.ps1"
 
     $miseConfig = Join-Path $HOME ".config\mise\config.toml"
     if (Test-Path $miseConfig) {
-        Write-Host "Installing mise toolchain..." -ForegroundColor Cyan
+        Log-Step "Installing mise toolchain..."
         mise install
         if ($LASTEXITCODE -ne 0) { throw "mise install failed" }
         mise doctor
-        if ($LASTEXITCODE -ne 0) { Write-Warning "mise doctor reported issues. Review output above." }
+        if ($LASTEXITCODE -ne 0) { Log-Warn "mise doctor reported issues. Review output above." }
         mise ls
     } else {
-        Write-Warning "mise config not found: $miseConfig"
+        Log-Warn "mise config not found: $miseConfig"
     }
 }
 
-Write-Host "Bootstrap complete." -ForegroundColor Green
+Log-Info "Bootstrap complete."

@@ -6,6 +6,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "common\logging.ps1")
+
 function Test-FontInstalled {
     param([Parameter(Mandatory)][string]$Pattern)
 
@@ -28,7 +30,7 @@ function Test-FontInstalled {
 }
 
 if (-not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
-    Write-Warning "oh-my-posh not found. Install it first (winget: JanDeDobbeleer.OhMyPosh)."
+    Log-Warn "oh-my-posh not found. Install it first (winget: JanDeDobbeleer.OhMyPosh)."
     return
 }
 
@@ -44,29 +46,29 @@ if (-not (Test-Path $themesPath)) {
 
 $themePath = Join-Path $themesPath $ThemeName
 if (-not (Test-Path $themePath)) {
-    Write-Host "Theme not found locally, attempting to download: $ThemeName" -ForegroundColor Yellow
+    Log-Warn "Theme not found locally, attempting to download: $ThemeName"
     $themeUrl = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/$ThemeName"
     try {
         Invoke-WebRequest -Uri $themeUrl -OutFile $themePath
     }
     catch {
-        Write-Warning "Failed to download theme from $themeUrl"
+        Log-Warn "Failed to download theme from $themeUrl"
     }
 }
 
 $fontInstalled = Test-FontInstalled -Pattern "JetBrainsMono.*Nerd Font"
 if (-not $fontInstalled) {
-    Write-Host "Installing Nerd Font via oh-my-posh: $FontName" -ForegroundColor Yellow
+    Log-Warn "Installing Nerd Font via oh-my-posh: $FontName"
     try {
         oh-my-posh font install $FontName
     }
     catch {
-        Write-Warning "oh-my-posh font install failed. Falling back to winget package."
+        Log-Warn "oh-my-posh font install failed. Falling back to winget package."
         if (Get-Command winget -ErrorAction SilentlyContinue) {
             winget install --id DEVCOM.JetBrainsMonoNerdFont --exact --accept-source-agreements --accept-package-agreements
         }
     }
 }
 
-Write-Host "oh-my-posh ready. Theme path: $themePath" -ForegroundColor Green
-Write-Host "If font was newly installed, restart Windows Terminal to apply font cache updates." -ForegroundColor Green
+Log-Info "oh-my-posh ready. Theme path: $themePath"
+Log-Info "If font was newly installed, restart Windows Terminal to apply font cache updates."

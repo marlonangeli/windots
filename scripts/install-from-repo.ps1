@@ -19,10 +19,22 @@ $script:CurrentStep = "bootstrap"
 $script:chezmoiExe = $null
 $startedTranscript = $false
 
+$loggerPath = if ($PSScriptRoot) { Join-Path $PSScriptRoot "common\logging.ps1" } else { "" }
+if ($loggerPath -and (Test-Path $loggerPath)) {
+    . $loggerPath
+}
+else {
+    function Log-Info { param([Parameter(Mandatory)][string]$Message) Write-Host "[INFO] $Message" -ForegroundColor Gray }
+    function Log-Step { param([Parameter(Mandatory)][string]$Message) Write-Host "==> $Message" -ForegroundColor Cyan }
+    function Log-Warn { param([Parameter(Mandatory)][string]$Message) Write-Host "[WARN] $Message" -ForegroundColor Yellow }
+    function Log-Error { param([Parameter(Mandatory)][string]$Message) Write-Host "[ERROR] $Message" -ForegroundColor Red }
+    function Log-NewLine { Write-Host "" }
+}
+
 function Write-Step {
     param([string]$Message)
     $script:CurrentStep = $Message
-    Write-Host "==> $Message" -ForegroundColor Cyan
+    Log-Step $Message
 }
 
 function Ensure-WingetPackage {
@@ -30,11 +42,11 @@ function Ensure-WingetPackage {
 
     $installed = winget list --id $Id --exact --accept-source-agreements 2>$null
     if ($LASTEXITCODE -eq 0 -and $installed) {
-        Write-Host "    already installed: $Id" -ForegroundColor DarkGray
+        Log-Info "already installed: $Id"
         return
     }
 
-    Write-Host "    installing: $Id" -ForegroundColor Yellow
+    Log-Warn "installing: $Id"
     winget install --id $Id --exact --accept-source-agreements --accept-package-agreements
 }
 
@@ -142,7 +154,7 @@ function Resolve-ExistingSource {
 
     $pattern = Get-RepoRemotePattern -RepoName $RepoName
     if ($remote -match $pattern) {
-        Write-Host "    existing chezmoi source detected and matches repo: $remote" -ForegroundColor DarkGray
+        Log-Info "existing chezmoi source detected and matches repo: $remote"
         return $sourcePath
     }
 
@@ -155,14 +167,26 @@ function Resolve-RepoScriptPath {
         [Parameter(Mandatory)][string]$RelativePath
     )
 
-    $sourceParent = Split-Path -Parent $SourcePath
+    $trimmedSource = $SourcePath.Trim().Trim('"')
+    $sourceParent = Split-Path -Parent $trimmedSource
+    $defaultRoot = Join-Path $HOME ".local\share\chezmoi"
+    $rootFromSource = if ($trimmedSource -match "[\\/]home$") { $sourceParent } else { $trimmedSource }
     $candidates = @(
-        (Join-Path $SourcePath $RelativePath),
-        (Join-Path (Join-Path $SourcePath "home") $RelativePath),
+        (Join-Path $rootFromSource $RelativePath),
+        (Join-Path $defaultRoot $RelativePath),
+        (Join-Path $trimmedSource $RelativePath),
         (Join-Path $sourceParent $RelativePath)
     )
 
-    return $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    foreach ($candidate in ($candidates | Select-Object -Unique)) {
+        Log-Info "checking script path: $candidate"
+        if (Test-Path $candidate) {
+            Log-Info "resolved script path: $candidate"
+            return $candidate
+        }
+    }
+
+    return $null
 }
 
 if (-not $LogPath) {
@@ -174,7 +198,7 @@ try {
     $startedTranscript = $true
 }
 catch {
-    Write-Warning "Could not start transcript log: $($_.Exception.Message)"
+    Log-Warn "Could not start transcript log: $($_.Exception.Message)"
 }
 
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
@@ -209,7 +233,7 @@ Try:
 Log: $LogPath
 "@
         }
-        Write-Host "    using chezmoi: $script:chezmoiExe" -ForegroundColor DarkGray
+        Log-Info "using chezmoi: $script:chezmoiExe"
     }
 
     Set-InstallerEnvData
@@ -221,8 +245,8 @@ Log: $LogPath
             return
         }
 
-        Write-Host "    chezmoi init output:" -ForegroundColor Yellow
-        $initOutput | ForEach-Object { Write-Host "    $_" -ForegroundColor Yellow }
+        Log-Warn "chezmoi init output:"
+        $initOutput | ForEach-Object { Log-Warn "$_" }
 
         $sourcePath = Resolve-ExistingSource -Chez $script:chezmoiExe -RepoName $Repo
         if (-not $sourcePath) {
@@ -236,9 +260,11 @@ Log: $LogPath
             throw "chezmoi source-path failed with exit code $LASTEXITCODE"
         }
     }
+    $sourcePath = $sourcePath.Trim().Trim('"')
     if (-not (Test-Path $sourcePath)) {
         throw "Unable to resolve chezmoi source-path. Got: $sourcePath"
     }
+    Log-Info "chezmoi source-path: $sourcePath"
 
     $bootstrapPath = Resolve-RepoScriptPath -SourcePath $sourcePath -RelativePath "scripts\bootstrap.ps1"
     $validatePath = Resolve-RepoScriptPath -SourcePath $sourcePath -RelativePath "scripts\validate.ps1"
@@ -246,7 +272,9 @@ Log: $LogPath
     $secretsDepsPath = Resolve-RepoScriptPath -SourcePath $sourcePath -RelativePath "scripts\check-secrets-deps.ps1"
     $linkAiPath = Resolve-RepoScriptPath -SourcePath $sourcePath -RelativePath "scripts\link-ai-configs.ps1"
 
-    if (-not $bootstrapPath) { throw "Bootstrap script not found under source path: $sourcePath" }
+    if (-not $bootstrapPath) {
+        throw "Bootstrap script not found. source-path='$sourcePath' expected-root='$(Join-Path $HOME ".local\share\chezmoi")'"
+    }
     if (-not $validatePath) { throw "Validate script not found under source path: $sourcePath" }
 
     if ($AutoApply) {
@@ -281,40 +309,40 @@ Log: $LogPath
             }
         }
 
-        Write-Host ""
-        Write-Host "Setup completed." -ForegroundColor Green
-        Write-Host "Profile mode commands: pmode / pclean / pfull" -ForegroundColor Green
-        Write-Host "Install log: $LogPath" -ForegroundColor Green
+        Log-NewLine
+        Log-Info "Setup completed."
+        Log-Info "Profile mode commands: pmode / pclean / pfull"
+        Log-Info "Install log: $LogPath"
     }
     else {
-        Write-Host ""
-        Write-Host "Repository initialized only (manual apply mode)." -ForegroundColor Green
-        Write-Host "Next commands:" -ForegroundColor Yellow
-        Write-Host "1) Set-Location '$sourcePath'" -ForegroundColor Yellow
-        Write-Host "2) chezmoi apply" -ForegroundColor Yellow
-        Write-Host "3) ./scripts/bootstrap.ps1 -Mode $Mode" -ForegroundColor Yellow
-        Write-Host "4) ./scripts/validate.ps1" -ForegroundColor Yellow
+        Log-NewLine
+        Log-Info "Repository initialized only (manual apply mode)."
+        Log-Warn "Next commands:"
+        Log-Warn "1) Set-Location '$(Join-Path $HOME ".local\share\chezmoi")'"
+        Log-Warn "2) chezmoi apply"
+        Log-Warn "3) ./scripts/bootstrap.ps1 -Mode $Mode"
+        Log-Warn "4) ./scripts/validate.ps1"
         if (-not $SkipSecretsChecks) {
-            Write-Host "5) ./scripts/migrate-secrets.ps1" -ForegroundColor Yellow
+            Log-Warn "5) ./scripts/migrate-secrets.ps1"
             if (Test-Path $secretsDepsPath) {
-                Write-Host "6) ./scripts/check-secrets-deps.ps1" -ForegroundColor Yellow
+                Log-Warn "6) ./scripts/check-secrets-deps.ps1"
             }
         }
-        Write-Host "Install log: $LogPath" -ForegroundColor Green
+        Log-Info "Install log: $LogPath"
     }
 }
 catch {
-    Write-Host ""
-    Write-Host "Installation failed during step: $script:CurrentStep" -ForegroundColor Red
-    Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Log: $LogPath" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "Recovery options:" -ForegroundColor Yellow
-    Write-Host "1) Re-run same command (installer is idempotent)." -ForegroundColor Yellow
-    Write-Host "2) Re-run skipping base install:" -ForegroundColor Yellow
-    Write-Host "   & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1'))) -SkipBaseInstall" -ForegroundColor Yellow
-    Write-Host "3) Reopen terminal and run option 2 (refreshes PATH in new session)." -ForegroundColor Yellow
-    Write-Host "4) Verify chezmoi manually: winget list --id twpayne.chezmoi" -ForegroundColor Yellow
+    Log-NewLine
+    Log-Error "Installation failed during step: $script:CurrentStep"
+    Log-Error "Error: $($_.Exception.Message)"
+    Log-Warn "Log: $LogPath"
+    Log-NewLine
+    Log-Warn "Recovery options:"
+    Log-Warn "1) Re-run same command (installer is idempotent)."
+    Log-Warn "2) Re-run skipping base install:"
+    Log-Warn "   & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/marlonangeli/windots/main/init.ps1'))) -SkipBaseInstall"
+    Log-Warn "3) Reopen terminal and run option 2 (refreshes PATH in new session)."
+    Log-Warn "4) Verify chezmoi manually: winget list --id twpayne.chezmoi"
     throw
 }
 finally {

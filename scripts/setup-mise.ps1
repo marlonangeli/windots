@@ -3,8 +3,10 @@ param()
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "common\logging.ps1")
+
 if (-not (Get-Command mise -ErrorAction SilentlyContinue)) {
-    Write-Warning "mise not found."
+    Log-Warn "mise not found."
     exit 0
 }
 
@@ -20,14 +22,14 @@ if ($env:PATH -notlike "*$shimsPath*") {
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ([string]::IsNullOrWhiteSpace($userPath)) {
     [Environment]::SetEnvironmentVariable("Path", $shimsPath, "User")
-    Write-Host "Added mise shims to user PATH: $shimsPath" -ForegroundColor Green
+    Log-Info "Added mise shims to user PATH: $shimsPath"
 }
 elseif ($userPath -notlike "*$shimsPath*") {
     [Environment]::SetEnvironmentVariable("Path", "$userPath;$shimsPath", "User")
-    Write-Host "Updated user PATH with mise shims: $shimsPath" -ForegroundColor Green
+    Log-Info "Updated user PATH with mise shims: $shimsPath"
 }
 else {
-    Write-Host "mise shims already present in user PATH." -ForegroundColor DarkGray
+    Log-Info "mise shims already present in user PATH."
 }
 
 try {

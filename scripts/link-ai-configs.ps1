@@ -11,6 +11,8 @@ $targets = @(
     @{ Source = Join-Path $srcRoot "skills"; Dest = Join-Path $homePath ".config\ai\skills" }
 )
 
+. (Join-Path $PSScriptRoot "common\logging.ps1")
+
 foreach ($t in $targets) {
     $destParent = Split-Path -Parent $t.Dest
     if (-not (Test-Path $destParent)) { New-Item -ItemType Directory -Path $destParent -Force | Out-Null }
@@ -23,5 +25,5 @@ foreach ($t in $targets) {
         Copy-Item -Path $t.Source -Destination $t.Dest -Recurse -Force
     }
 
-    Write-Host "linked/copied: $($t.Dest)" -ForegroundColor Green
+    Log-Info "linked/copied: $($t.Dest)"
 }

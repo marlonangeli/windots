@@ -3,7 +3,9 @@ param()
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
-Write-Host "Running validation..." -ForegroundColor Cyan
+. (Join-Path $PSScriptRoot "common\logging.ps1")
+
+Log-Step "Running validation..."
 
 # 1) Basic files
 $required = @(
@@ -17,7 +19,7 @@ $required = @(
 foreach ($f in $required) {
     $p = Join-Path $repoRoot $f
     if (-not (Test-Path $p)) {
-        Write-Error "Missing required file: $f"
+        Log-Error "Missing required file: $f"
         exit 1
     }
 }
@@ -29,9 +31,9 @@ $targetFiles = Get-ChildItem -Path (Join-Path $repoRoot "home") -Recurse -File |
 }
 $hits = $targetFiles | Select-String -Pattern $patterns
 if ($hits) {
-    Write-Warning "Potential secret patterns found:"
+    Log-Warn "Potential secret patterns found:"
     $hits | Select-Object Path,LineNumber,Line | Format-Table -AutoSize
     exit 2
 }
 
-Write-Host "Validation OK" -ForegroundColor Green
+Log-Info "Validation OK"

@@ -35,6 +35,8 @@ Retry sem reinstalar dependências base:
 ```
 
 Se necessário, reabra o terminal antes do retry para garantir PATH atualizado.
+Se aparecer erro de script de bootstrap não encontrado, valide o root esperado do chezmoi:
+`$HOME/.local/share/chezmoi`.
 
 ## 3) Bootstrap (recomendado)
 

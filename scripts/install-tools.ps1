@@ -6,6 +6,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "common\logging.ps1")
+
 function Install-WingetPackage {
     param(
         [Parameter(Mandatory)][string]$Id,
@@ -14,15 +16,15 @@ function Install-WingetPackage {
 
     $installed = winget list --id $Id --exact --accept-source-agreements 2>$null
     if ($LASTEXITCODE -eq 0 -and $installed) {
-        Write-Host "already installed: $Id" -ForegroundColor DarkGray
+        Log-Info "already installed: $Id"
         return
     }
 
-    Write-Host "installing: $Id" -ForegroundColor Cyan
+    Log-Step "installing: $Id"
     winget install --id $Id --exact --accept-source-agreements --accept-package-agreements
     if ($LASTEXITCODE -ne 0) {
         if ($Optional) {
-            Write-Warning "optional package failed: $Id"
+            Log-Warn "optional package failed: $Id"
             return
         }
         throw "failed to install package: $Id"

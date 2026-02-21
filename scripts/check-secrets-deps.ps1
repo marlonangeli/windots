@@ -4,6 +4,8 @@ param()
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
+. (Join-Path $PSScriptRoot "common\logging.ps1")
+
 function Write-Status {
     param(
         [Parameter(Mandatory)][string]$Name,
@@ -16,7 +18,7 @@ function Write-Status {
     Write-Host ("[{0}] {1} - {2}" -f $state, $Name, $Message) -ForegroundColor $color
 }
 
-Write-Host "Checking secret-related dependencies and safeguards..." -ForegroundColor Cyan
+Log-Step "Checking secret-related dependencies and safeguards..."
 
 $bw = $null -ne (Get-Command bw -ErrorAction SilentlyContinue)
 $bwMessage = if ($bw) { "installed" } else { "optional, but recommended for runtime secret retrieval" }
@@ -61,4 +63,4 @@ if (Test-Path $jiraCfg) {
     Write-Status -Name "Jira template token placeholder" -Ok $ok -Message $jiraTemplateMessage
 }
 
-Write-Host "Done." -ForegroundColor Cyan
+Log-Info "Done."
