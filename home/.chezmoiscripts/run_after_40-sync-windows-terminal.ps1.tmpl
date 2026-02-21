@@ -45,6 +45,17 @@ if (-not (Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 }
 
+if (Test-Path $target) {
+    try {
+        $item = Get-Item $target -ErrorAction Stop
+        $item.IsReadOnly = $false
+        attrib -R $target 2>$null | Out-Null
+    }
+    catch {
+        Write-Warning "[wt-sync] unable to clear readonly attribute: $target"
+    }
+}
+
 $sourceHash = (Get-FileHash -Path $source -Algorithm SHA256).Hash
 $targetHash = if (Test-Path $target) { (Get-FileHash -Path $target -Algorithm SHA256).Hash } else { "" }
 
@@ -54,4 +65,12 @@ if ($sourceHash -eq $targetHash) {
 }
 
 Copy-Item -Path $source -Destination $target -Force
+try {
+    $written = Get-Item $target -ErrorAction Stop
+    $written.IsReadOnly = $false
+    attrib -R $target 2>$null | Out-Null
+}
+catch {
+    Write-Warning "[wt-sync] file copied but failed to normalize writable attribute: $target"
+}
 Write-Host "[wt-sync] synced: $target (from $source)" -ForegroundColor Green

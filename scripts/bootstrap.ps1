@@ -7,15 +7,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if (-not $SkipInstall) {
-    & "$PSScriptRoot\install-tools.ps1" -Mode $Mode
-}
-
 Write-Host "Applying chezmoi changes..." -ForegroundColor Cyan
 if (Get-Command chezmoi -ErrorAction SilentlyContinue) {
     chezmoi apply
 } else {
     Write-Warning "chezmoi not found. Install it first."
+}
+
+if (-not $SkipInstall) {
+    & "$PSScriptRoot\install-tools.ps1" -Mode $Mode
 }
 
 Write-Host "Linking AI config..." -ForegroundColor Cyan
@@ -28,6 +28,9 @@ Write-Host "Configuring oh-my-posh themes and fonts..." -ForegroundColor Cyan
 & "$PSScriptRoot\setup-oh-my-posh.ps1"
 
 if (Get-Command mise -ErrorAction SilentlyContinue) {
+    Write-Host "Configuring mise PATH and activation..." -ForegroundColor Cyan
+    & "$PSScriptRoot\setup-mise.ps1"
+
     $miseConfig = Join-Path $HOME ".config\mise\config.toml"
     if (Test-Path $miseConfig) {
         Write-Host "Installing mise toolchain..." -ForegroundColor Cyan

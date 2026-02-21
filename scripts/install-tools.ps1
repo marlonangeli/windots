@@ -55,17 +55,3 @@ foreach ($id in $packages) {
     $optional = $id -in @("DEVCOM.JetBrainsMonoNerdFont", "GitHub.Copilot")
     Install-WingetPackage -Id $id -Optional:$optional
 }
-
-if (Get-Command mise -ErrorAction SilentlyContinue) {
-    $miseConfig = Join-Path $HOME ".config\mise\config.toml"
-    if (Test-Path $miseConfig) {
-        Write-Host "mise detected. Installing toolchain from $miseConfig..." -ForegroundColor Yellow
-        mise install
-        if ($LASTEXITCODE -ne 0) { throw "mise install failed" }
-        mise doctor
-        if ($LASTEXITCODE -ne 0) { Write-Warning "mise doctor reported issues. Review output above." }
-        mise ls
-    } else {
-        Write-Warning "mise config not found: $miseConfig"
-    }
-}
