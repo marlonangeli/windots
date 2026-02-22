@@ -29,6 +29,15 @@ function Enable-TerminalIcons {
     }
 }
 
+$global:__PoshGitLoaded = $false
+function Enable-PoshGit {
+    if ($global:__PoshGitLoaded) { return }
+    if (Get-Module -ListAvailable -Name posh-git) {
+        Import-Module posh-git -ErrorAction SilentlyContinue
+        $global:__PoshGitLoaded = $true
+    }
+}
+
 $global:__ZoxideLoaded = $false
 function Enable-Zoxide {
     if ($global:__ZoxideLoaded) { return }
@@ -66,6 +75,8 @@ function Enable-PoshPrompt {
 }
 
 if (Test-InteractiveShell -and $global:__PSProfileMode -eq "full") {
+    Enable-PoshGit
+
     function global:prompt {
         Enable-PoshPrompt
         if ($global:__PoshInitialized) {

@@ -1,154 +1,217 @@
 # windots
 
-Dotfiles Windows para produtividade Dev/AI com `chezmoi` + PowerShell, com foco em reprodutibilidade, segurança e automação idempotente.
+```text  
+  $$\      $$\ $$$$$$\ $$\   $$\ $$$$$$$\   $$$$$$\ $$$$$$$$\  $$$$$$\
+  $$ | $\  $$ |\_$$  _|$$$\  $$ |$$  __$$\ $$  __$$\\__$$  __|$$  __$$\
+  $$ |$$$\ $$ |  $$ |  $$$$\ $$ |$$ |  $$ |$$ /  $$ |  $$ |   $$ /  \__|
+  $$ $$ $$\$$ |  $$ |  $$ $$\$$ |$$ |  $$ |$$ |  $$ |  $$ |   \$$$$$$\
+  $$$$  _$$$$ |  $$ |  $$ \$$$$ |$$ |  $$ |$$ |  $$ |  $$ |    \____$$\
+  $$$  / \$$$ |  $$ |  $$ |\$$$ |$$ |  $$ |$$ |  $$ |  $$ |   $$\   $$ |
+  $$  /   \$$ |$$$$$$\ $$ | \$$ |$$$$$$$  | $$$$$$  |  $$ |   \$$$$$$  |
+  \__/     \__|\______|\__|  \__|\_______/  \______/   \__|    \______/
+```
 
-## Escopo
+Windows dotfiles managed with `chezmoi` and PowerShell automation.
 
-- Perfil PowerShell modular (`full`/`clean`) em `home/dot_config/powershell/`
-- Configs de terminal, Git, Zed, Codex, Copilot e ferramentas AI/MCP
-- Scripts operacionais em `scripts/` para bootstrap, instalação, validação e migração de segredos
+The repo is module-driven, idempotent, and designed for repeatable machine setup.
 
-## Requisitos
+## Why windots
 
+- Single entrypoint (`install.ps1`) for first install and day-2 operations.
+- Guided action menu (`INSTALL`, `UPDATE`, `RESTORE`, `QUIT`) with non-interactive flags.
+- Module orchestration with explicit dependency order.
+- Preflight checks and validation gates to reduce setup drift and surprises.
+
+## Requirements
+
+- Windows with `winget` available
 - PowerShell 7+
 - Git
-- [chezmoi](https://www.chezmoi.io/)
-- Opcional: `gh`, `bw`, `mise`, `gum`
+- [`chezmoi`](https://www.chezmoi.io/)
 
-## Quick Start
+These are checked during installer preflight (`scripts/common/preflight.ps1`).
 
-```powershell
-chezmoi init --apply <SEU_USER_GITHUB>/windots
-pwsh ./scripts/bootstrap.ps1 -Mode full
-pwsh ./scripts/validate.ps1
-```
+Optional tools:
 
-Fluxo seguro de atualização (recomendado):
+- [`mise`](https://mise.jdx.dev)
+- [`gum`](https://github.com/charmbracelet/gum)
+- [`bw`](https://bitwarden.com/help/cli/)
 
-```powershell
-pwsh ./scripts/windots.ps1 -Command update
-```
+## Installation
 
-> Se quiser pular instalação/validação de toolchain `mise` no bootstrap:
-> `pwsh ./scripts/bootstrap.ps1 -Mode full -SkipMise`
-
-### One-command installer (remote)
+Canonical remote install:
 
 ```powershell
 irm https://windots.ilegna.dev/install | iex
 ```
 
-Esse comando baixa o `install.ps1`, instala dependências base e inicializa o source do `chezmoi`.
-Para aplicar/configurar tudo automaticamente, use `-AutoApply`.
-
-Se falhar por PATH recém-atualizado (ex.: `chezmoi not found`), rode sem reinstalar base:
+Direct GitHub raw fallback:
 
 ```powershell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1"))) -SkipBaseInstall
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1")))
 ```
 
-Se ainda falhar, feche e abra um novo terminal e execute o comando acima novamente.
-
-Se aparecer erro de bootstrap script não encontrado, o instalador resolve scripts pelo root esperado:
-`$HOME/.local/share/chezmoi` (mesmo quando `chezmoi source-path` retorna `.../home`).
-
-Por padrão, o `install.ps1` apenas inicializa/clona o source do `chezmoi` e mostra os próximos comandos para você rodar manualmente (`chezmoi apply`, bootstrap e validação).  
-Para modo totalmente automático, use:
+Run locally:
 
 ```powershell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1"))) -AutoApply
+pwsh -NoProfile -File ./install.ps1
 ```
 
-O instalador agora coleta dados interativamente (`user.name`, `user.email`, `github_username`, Azure opcional).  
-Para execução sem prompts: `-NoPrompt`.
-Para selecionar módulos específicos no auto-apply: `-Modules core,shell,terminal`.
-Para instalar/testar a partir de branch/ref/local: `-Branch`, `-Ref`, `-LocalRepoPath`.
+## Installer Actions
 
-Exemplos:
+Interactive menu:
+
+- `INSTALL`: installs prerequisites, initializes source, runs bootstrap/validation.
+- `UPDATE`: runs safe update flow (`chezmoi update` + bootstrap + validation + verify).
+- `RESTORE`: replays install/bootstrap from restore config + secret env references.
+- `QUIT`: exits without changes.
+
+Non-interactive examples:
 
 ```powershell
-# branch específica
-pwsh -NoProfile -File ./install.ps1 -Branch feature/install-refactor -AutoApply
+# unattended install
+pwsh -NoProfile -File ./install.ps1 -Action install -AutoApply -NoPrompt
 
-# commit/tag específico (Ref sobrescreve Branch)
-pwsh -NoProfile -File ./install.ps1 -Ref <sha-ou-tag> -AutoApply
+# unattended update
+pwsh -NoProfile -File ./install.ps1 -Action update -NoPrompt
 
-# teste sem push usando repositório local
-pwsh -NoProfile -File ./install.ps1 -LocalRepoPath C:\\src\\windots -AutoApply
+# unattended restore with explicit config
+pwsh -NoProfile -File ./install.ps1 -Action restore -RestoreConfigPath "$env:LOCALAPPDATA\windots\state\restore.json" -NoPrompt
 ```
 
-## Desenvolvimento local
+Passing arguments from remote invocation:
 
 ```powershell
-chezmoi init --source .
-chezmoi diff
-chezmoi apply
-pwsh ./scripts/validate.ps1
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1"))) -Action install -AutoApply -NoPrompt -Mode full
 ```
 
-## Scripts principais
+## Source Selection for Testing
 
-- `scripts/bootstrap.ps1`: delega para o runner de módulos (`full`/`clean`)
-- `scripts/install.ps1`: instalador canônico (repo/branch/ref/local source)
-- `scripts/install-from-repo.ps1`: alias de compatibilidade para `scripts/install.ps1`
-- `scripts/run-modules.ps1`: resolve dependências e executa módulos em ordem determinística
-- `scripts/install-tools.ps1`: instala toolchain base via `winget`
-- `scripts/validate.ps1`: valida arquivos obrigatórios e padrões de segredos
-- `scripts/validate-modules.ps1`: valida contrato do registry de módulos
-- `scripts/windots.ps1`: wrapper para `update/apply/bootstrap/validate`
-- `scripts/link-ai-configs.ps1`: copia/symlink de `home/dot_config/ai` para `~/.config/ai`
-- `scripts/install-profile-shim.ps1`: cria perfil shim no caminho oficial do PowerShell apontando para `~/.config/powershell`
-- `scripts/export-current.ps1`: exporta estado local para `_staging`
-- `scripts/migrate-secrets.ps1`: checagem de legados (`.jira_access_token`, `tfstoken`)
-- `scripts/check-secrets-deps.ps1`: auditoria de dependências e proteções para segredos
+`install.ps1` supports testing from branch, ref, and local source:
 
-## Módulos atuais
+```powershell
+# branch
+pwsh -NoProfile -File ./install.ps1 -Branch feature/my-change -AutoApply
 
-- `core`: aplica estado declarativo com `chezmoi apply`
-- `packages`: instala base via `install-tools.ps1`
-- `shell`: instala profile shim do PowerShell
-- `themes`: configura oh-my-posh e fonte
-- `terminal`: valida presença do template/hook do Windows Terminal
-- `ai`: sincroniza `~/.config/ai`
-- `mise`: ativa PATH e instala toolchain declarada
-- `secrets`: executa checks de migração/dependências de segredos
-- `validate`: executa validação do repositório
+# tag/commit (overrides branch)
+pwsh -NoProfile -File ./install.ps1 -Ref <sha-or-tag> -AutoApply
 
-## Pós-Update automático
+# local repository
+pwsh -NoProfile -File ./install.ps1 -LocalRepoPath "C:\src\windots" -AutoApply
+```
 
-- `chezmoi update` já executa um hook em `home/.chezmoiscripts/run_after_*` que replica `~/.config/windows-terminal/settings.json`
-  para `~/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`.
-- Isso garante que o template em `home/dot_config/windows-terminal/settings.json.tmpl` seja refletido no Windows Terminal Stable.
+Safety guard for non-main validation:
 
-## Toolchain com mise
+```powershell
+pwsh -NoProfile -File ./install.ps1 -RequireNonMain -Branch feature/my-change -AutoApply
+```
 
-- `mise` é o gerenciador preferencial para CLIs de desenvolvimento no perfil:
-  - `node`, `bun`, `pnpm`, `python`, `go`, `rust`, `dotnet`
-  - `gh`, `codex`, `ripgrep`, `fd`, `bat`, `zoxide`, `starship`
-- `home/dot_config/mise/config.toml.tmpl` é a fonte declarativa.
-- `bootstrap` roda `mise install`, `mise doctor` e `mise ls`.
-- `GitHub.Copilot` permanece via `winget` (se disponível).
+`-RequireNonMain` fails fast if you accidentally run against `main` without an explicit `-Ref` or `-LocalRepoPath`.
 
-## Oh My Posh
+## Architecture
 
-- `bootstrap` executa `scripts/setup-oh-my-posh.ps1` para:
-  - garantir tema `catppuccin_mocha.omp.json` em `$env:POSH_THEMES_PATH`
-  - instalar/garantir Nerd Font JetBrains Mono (fallback via winget)
-- O profile PowerShell usa fallback de `POSH_THEMES_PATH` para `%LOCALAPPDATA%\Programs\oh-my-posh\themes`.
+Module registry:
 
-## Estrutura
+- `modules/module-registry.ps1`
+
+High-level flow:
 
 ```text
-home/      # templates chezmoi (dotfiles e configs)
-scripts/   # automações de setup/validação/migração
-tests/     # pester/integration/sandbox
-docs/      # documentação de setup, segredos, migração e decisões
+install.ps1
+  -> scripts/windots.ps1 (update/restore paths)
+  -> scripts/bootstrap.ps1 (module runner entry)
+      -> scripts/run-modules.ps1
+          -> modules/<name>/module.ps1
+              -> modules/packages/manager.ps1 (when module declares packages)
 ```
 
-## Documentação
+Main modules:
+
+- `core`: base orchestration and chezmoi apply workflow
+- `packages`: shared package operations
+- `shell`: PowerShell profile and shell tooling
+- `development`: runtime/toolchain selection (dotnet/node/bun/python)
+- `themes`, `terminal`, `ai`, `mise`, `secrets`, `validate`
+
+## Package Management
+
+Package source of truth:
+
+- `modules/packages/repository.psd1`
+
+Providers:
+
+- `modules/packages/provider-winget.ps1`
+- `modules/packages/provider-mise.ps1`
+
+Manager:
+
+- `modules/packages/manager.ps1`
+
+How it works:
+
+- Each package declares provider, package id, module mapping, modes, and required/optional state.
+- Modules install only packages mapped to themselves.
+- Interactive flows can choose default package set or specific optional packages.
+
+## Winget Contract
+
+All managed `winget install/upgrade` operations flow through:
+
+- `scripts/common/winget.ps1`
+
+Behavior:
+
+- Forces `--source winget`
+- Appends source/package agreement flags
+- Handles msstore certificate/source fallback (`0x8a15005e`)
+- Logs command and exit code, fails fast on unrecoverable errors
+
+## Day-2 Commands
+
+```powershell
+pwsh ./scripts/windots.ps1 -Command update
+pwsh ./scripts/windots.ps1 -Command apply
+pwsh ./scripts/windots.ps1 -Command bootstrap -Mode clean
+pwsh ./scripts/windots.ps1 -Command restore -RestoreConfigPath "$env:LOCALAPPDATA\windots\state\restore.json"
+pwsh ./scripts/windots.ps1 -Command validate
+```
+
+## Validation and Tests
+
+Local validation:
+
+```powershell
+pwsh -NoProfile -File ./scripts/validate.ps1
+pwsh -NoProfile -File ./scripts/validate-modules.ps1
+```
+
+Full local test runner:
+
+```powershell
+pwsh -NoProfile -File ./tests/run.ps1
+```
+
+`tests/run.ps1` covers:
+
+- repository validation
+- optional lint (`PSScriptAnalyzer`)
+- Pester test suite
+- integration idempotency sequence (`chezmoi apply/verify/apply/diff`)
+
+## Repository Layout
+
+```text
+home/      # chezmoi templates (dotfiles + app configs)
+scripts/   # installer/orchestration/validation/common helpers
+modules/   # module entrypoints + module-owned automation
+tests/     # smoke, pester, integration runner assets
+docs/      # operational docs and architecture notes
+```
+
+## Documentation
 
 - [Setup](docs/SETUP.md)
-- [Segredos](docs/SECRETS.md)
-- [Migração](docs/MIGRATION.md)
-- [Decisões](docs/DECISIONS.md)
-- [PowerShell profile docs](home/dot_config/powershell/docs/README.md)
+- [Restore](docs/RESTORE.md)
+- [Decisions](docs/DECISIONS.md)
+- [Secrets](docs/SECRETS.md)

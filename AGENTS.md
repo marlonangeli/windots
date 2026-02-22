@@ -18,7 +18,8 @@ pwsh ./scripts/validate.ps1
 
 ## Project Structure & Module Organization
 - `home/`: source-of-truth templates for shell, git, terminal, editors, AI/MCP.
-- `scripts/`: repo operations (`bootstrap`, `install-tools`, `validate`, `link-ai-configs`, `export-current`, `migrate-secrets`).
+- `scripts/`: repo operations (`bootstrap`, `run-modules`, `validate`, `windots`, `export-current`) and shared helpers.
+- `modules/<name>/`: module entrypoint plus module-owned scripts/config files.
 - `docs/`: setup, migration, secrets, and architecture decisions.
 - `home/dot_config/powershell/`: modular profile and workflow modules.
 - `.github/workflows/validate.yml`: runs `scripts/validate.ps1` on push/PR.
@@ -29,7 +30,7 @@ pwsh ./scripts/validate.ps1
 - `chezmoi apply`: apply templates.
 - `pwsh ./scripts/bootstrap.ps1 -Mode full`: full setup.
 - `pwsh ./scripts/bootstrap.ps1 -Mode clean -SkipInstall`: reconfigure without package install.
-- `pwsh ./scripts/link-ai-configs.ps1 -UseSymlink`: symlink AI config dirs instead of copying.
+- `pwsh ./modules/ai/link-configs.ps1 -UseSymlink`: symlink AI config dirs instead of copying.
 - `pwsh ./scripts/validate.ps1`: mandatory validation before commit/PR.
 
 ## PowerShell Profile Behavior
@@ -42,7 +43,7 @@ pwsh ./scripts/validate.ps1
 
 ## Coding Style & Naming Conventions
 - PowerShell: 4-space indentation, `[CmdletBinding()]`, explicit `param(...)`.
-- Scripts: kebab-case names (example: `install-tools.ps1`).
+- Scripts: kebab-case names for utility scripts and `module.ps1` for module entrypoints.
 - Keep scripts idempotent and avoid host-specific hardcoding.
 - Add new managed config under `home/dot_config/<tool>/...` when possible.
 
@@ -55,4 +56,4 @@ pwsh ./scripts/validate.ps1
 - Never commit secrets, keys, or tokens.
 - `.ai/` is ignored; keep local AI context there.
 - Use `.local.*` files and external secret stores (see `docs/SECRETS.md`).
-- Run `pwsh ./scripts/migrate-secrets.ps1` when importing legacy environments.
+- Run `pwsh ./modules/secrets/migrate.ps1` when importing legacy environments.

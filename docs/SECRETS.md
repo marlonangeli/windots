@@ -1,33 +1,41 @@
 # Secrets
 
-## Regras
+## Rules
 
-- Nunca versionar tokens, chaves ou senhas.
-- Usar Bitwarden CLI (`bw`) para recuperação em runtime quando aplicável.
-- Manter overrides locais privados como `.local.*`.
-- Validar sempre antes de commit: `pwsh ./scripts/validate.ps1`.
-- Em mudanças na orquestração de módulos, validar também: `pwsh ./scripts/validate-modules.ps1`.
+- Never commit tokens, private keys, or passwords.
+- Keep secrets in external stores (for example Bitwarden) and inject at runtime.
+- Keep host-specific overrides outside tracked templates (`*.local.*`, private files, env vars).
+- In restore config, store only environment variable names in `secretEnv`, never secret values.
 
-## Itens sensíveis comuns
+Validate before commit:
+
+```powershell
+pwsh -NoProfile -File ./scripts/validate.ps1
+```
+
+## Sensitive Paths To Watch
 
 - `~/.codex/auth.json`
-- `~/.jira_access_token` (legado; evitar)
 - `~/.ssh/id_*`
-- credenciais em `.gitconfig` (ex.: `tfstoken=`)
-- tokens em configs de editor/CLI
+- credential-bearing entries in `~/.gitconfig`
 
-## Fluxo recomendado de migração/rotação
+## Rotation and Cleanup Workflow
 
-1. Executar `pwsh ./scripts/migrate-secrets.ps1` para detectar legados.
-2. Executar `pwsh ./scripts/check-secrets-deps.ps1` para validar dependências e proteções do repositório.
-3. Revogar credenciais expostas.
-4. Gerar novas credenciais.
-5. Salvar no cofre (Bitwarden) e injetar por variável de ambiente/local privado.
+1. Run repository checks:
 
-## Referências
+```powershell
+pwsh ./modules/secrets/migrate.ps1
+pwsh ./modules/secrets/deps-check.ps1
+```
 
-- [Validação automática](../scripts/validate.ps1)
-- [Validação de módulos](../scripts/validate-modules.ps1)
-- [Migração de segredos](../scripts/migrate-secrets.ps1)
-- [Dependências de segredos](../scripts/check-secrets-deps.ps1)
-- [Gitignore do repositório](../.gitignore)
+2. Revoke exposed credentials.
+3. Create replacement credentials.
+4. Store replacements in secret manager and reinject via environment/local untracked files.
+
+## Related Files
+
+- `scripts/validate.ps1`
+- `modules/secrets/module.ps1`
+- `modules/secrets/migrate.ps1`
+- `modules/secrets/deps-check.ps1`
+- `.gitignore`
