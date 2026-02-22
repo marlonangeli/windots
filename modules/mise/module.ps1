@@ -1,8 +1,11 @@
 [CmdletBinding()]
 param()
 
-$scriptsRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$scriptsRoot = Join-Path $repoRoot "scripts"
+
 . (Join-Path $scriptsRoot "common\logging.ps1")
+. (Join-Path $repoRoot "modules\packages\manager.ps1")
 
 function Invoke-WindotsModuleMise {
     [CmdletBinding()]
@@ -15,26 +18,29 @@ function Invoke-WindotsModuleMise {
         return
     }
 
-    if (-not (Get-Command mise -ErrorAction SilentlyContinue)) {
-        Log-Warn "[mise] mise not found. Install it first or use -SkipMise."
-        return
+    if (-not $Context.SkipInstall) {
+        $mode = if ($Context.Mode) { $Context.Mode } else { "full" }
+        Ensure-WindotsModulePackages -Module "mise" -Mode $mode -WhatIf:$Context.WhatIf
     }
 
-    # TODO: setup mise deveria estar em um modulo especifico
-    $setupPath = Join-Path $scriptsRoot "setup-mise.ps1"
+    $setupPath = Join-Path $PSScriptRoot "setup.ps1"
     if (-not (Test-Path $setupPath)) {
         throw "[mise] Missing script: $setupPath"
     }
 
     if ($Context.WhatIf) {
-        Log-Info "[mise] WhatIf: would configure mise PATH and install toolchain."
+        Log-Info "[mise] WhatIf: would configure mise and install toolchain."
         return
     }
 
-    Log-Step "[mise] Configuring PATH and shell activation"
     & $setupPath
     if ($LASTEXITCODE -ne 0) {
-        throw "[mise] setup-mise failed with exit code $LASTEXITCODE"
+        throw "[mise] setup script failed with exit code $LASTEXITCODE"
+    }
+
+    if (-not (Get-Command mise -ErrorAction SilentlyContinue)) {
+        Log-Warn "[mise] command not found after setup."
+        return
     }
 
     $miseConfig = Join-Path $HOME ".config\mise\config.toml"
@@ -51,7 +57,7 @@ function Invoke-WindotsModuleMise {
 
     mise doctor
     if ($LASTEXITCODE -ne 0) {
-        Log-Warn "[mise] mise doctor reported issues. Review output above."
+        Log-Warn "[mise] mise doctor reported issues."
     }
 
     mise ls

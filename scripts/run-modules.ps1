@@ -1,4 +1,3 @@
-# TODO: novamente varios parametros sem documentacao e com complexidade que pode ser simplificada
 [CmdletBinding()]
 param(
     [ValidateSet("full", "clean")]
@@ -18,12 +17,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$repoRoot = Split-Path -Parent $PSScriptRoot
 
 . (Join-Path $PSScriptRoot "common\logging.ps1")
-. (Join-Path $PSScriptRoot "modules\module-registry.ps1")
+. (Join-Path $repoRoot "modules\module-registry.ps1")
 
 if ($ListModules) {
-    Get-WindotsModuleRegistry -ScriptsRoot $PSScriptRoot |
+    Get-WindotsModuleRegistry -ScriptsRoot $repoRoot |
         Select-Object -ExpandProperty Name
     return
 }
@@ -35,15 +35,30 @@ else {
     Get-WindotsDefaultModules -Mode $Mode
 }
 
+if ($SkipMise) {
+    $requestedModules = @($requestedModules | Where-Object { $_ -ne "mise" })
+}
+
 if ($IncludeSecretsChecks -and ($requestedModules -notcontains "secrets")) {
     $requestedModules += "secrets"
+}
+
+if ($SkipSecretsChecks) {
+    $requestedModules = @($requestedModules | Where-Object { $_ -ne "secrets" })
 }
 
 if ($IncludeValidation -and ($requestedModules -notcontains "validate")) {
     $requestedModules += "validate"
 }
 
-$plan = Resolve-WindotsModuleExecutionPlan -Mode $Mode -RequestedModules $requestedModules -ScriptsRoot $PSScriptRoot
+$requestedModules = @(
+    $requestedModules |
+        ForEach-Object { $_.ToString().Trim().ToLowerInvariant() } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -Unique
+)
+
+$plan = Resolve-WindotsModuleExecutionPlan -Mode $Mode -RequestedModules $requestedModules -ScriptsRoot $repoRoot
 if (-not $plan -or $plan.Count -eq 0) {
     Log-Warn "No modules selected for execution."
     return
@@ -72,35 +87,22 @@ $context = @{
     NoPrompt = [bool]$NoPrompt
     WhatIf = [bool]$WhatIf
     ScriptsRoot = $PSScriptRoot
-    RepoRoot = (Split-Path -Parent $PSScriptRoot)
+    RepoRoot = $repoRoot
 }
 
 $sequence = $plan | Select-Object -ExpandProperty Name
 Log-Info ("Module execution order: " + ($sequence -join " -> "))
 
-# TODO: uso desnecessario de varias flags de skip, que podem ser simplificadas utilizando uma estrutura de configuração mais clara e menos propensa a erros. Além disso, a lógica de execução dos módulos poderia ser melhorada para lidar com dependências e pré-requisitos de forma mais robusta, evitando a necessidade de verificações manuais e garantindo uma execução mais fluida e confiável dos módulos.
 foreach ($module in $plan) {
-    if ($module.Name -eq "packages" -and $SkipInstall) {
-        Log-Info "Skipping module 'packages' because -SkipInstall was set."
-        continue
-    }
-
-    if ($module.Name -eq "mise" -and $SkipMise) {
-        Log-Info "Skipping module 'mise' because -SkipMise was set."
-        continue
-    }
-
-    if ($module.Name -eq "secrets" -and $SkipSecretsChecks) {
-        Log-Info "Skipping module 'secrets' because -SkipSecretsChecks was set."
-        continue
-    }
-
     if (-not (Get-Command $module.EntryFunction -ErrorAction SilentlyContinue)) {
         throw "Module entrypoint not found: $($module.EntryFunction)"
     }
 
     Log-Step ("Running module: {0}" -f $module.Name)
-
-    # TODO: sem error handling
-    & $module.EntryFunction -Context $context
+    try {
+        & $module.EntryFunction -Context $context
+    }
+    catch {
+        throw "Module '$($module.Name)' failed: $($_.Exception.Message)"
+    }
 }

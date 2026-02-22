@@ -1,130 +1,103 @@
 # Setup
 
-## 1) Instalar ferramentas base
+## 1) Run the installer
 
-```powershell
-winget install twpayne.chezmoi Git.Git Microsoft.PowerShell GitHub.cli
-```
-
-Pacotes opcionais recomendados:
-
-```powershell
-winget install jdx.mise JanDeDobbeleer.OhMyPosh charmbracelet.gum
-```
-
-## 2) Aplicar dotfiles
-
-```powershell
-chezmoi init --apply <SEU_USER_GITHUB>/windots
-```
-
-Alternativa em comando único (remote install script):
+Canonical remote command:
 
 ```powershell
 irm https://windots.ilegna.dev/install | iex
 ```
 
-Por padrão esse comando só inicializa/clona o source do `chezmoi` e exibe os próximos passos para execução manual.
-Se quiser fluxo automático completo:
+Local file execution:
 
 ```powershell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1"))) -AutoApply
+pwsh -NoProfile -File ./install.ps1
 ```
 
-O fluxo pergunta dados de configuração (Git/GitHub/Azure opcional).  
-Para modo silencioso: `-NoPrompt`.
-Para seleção explícita de módulos no fluxo automático: `-Modules core,shell,terminal`.
-Para testar por branch/ref/local: `-Branch`, `-Ref`, `-LocalRepoPath`.
+In interactive mode, installer execution shows the action menu:
 
-Exemplos de teste:
+- `INSTALL`
+- `UPDATE`
+- `RESTORE`
+- `QUIT`
+
+Use `-Action install -AutoApply` for full unattended flow.
+
+In interactive mode, package-heavy modules can prompt for default package set vs specific package selection.
 
 ```powershell
-pwsh -NoProfile -File ./install.ps1 -Branch feature/install-refactor -AutoApply
-pwsh -NoProfile -File ./install.ps1 -Ref <sha-ou-tag> -AutoApply
-pwsh -NoProfile -File ./install.ps1 -LocalRepoPath C:\\src\\windots -AutoApply
+pwsh -NoProfile -File ./install.ps1 -Action install -AutoApply -NoPrompt
 ```
 
-Retry sem reinstalar dependências base:
+## 2) Select source for testing
 
 ```powershell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1"))) -SkipBaseInstall
+# branch
+pwsh -NoProfile -File ./install.ps1 -Branch feature/my-change -AutoApply
+
+# commit/tag (overrides branch)
+pwsh -NoProfile -File ./install.ps1 -Ref <sha-or-tag> -AutoApply
+
+# local repository
+pwsh -NoProfile -File ./install.ps1 -LocalRepoPath C:\src\windots -AutoApply
 ```
 
-Se necessário, reabra o terminal antes do retry para garantir PATH atualizado.
-Se aparecer erro de script de bootstrap não encontrado, valide o root esperado do chezmoi:
-`$HOME/.local/share/chezmoi`.
+Optional guard:
 
-## 3) Bootstrap (recomendado)
+```powershell
+pwsh -NoProfile -File ./install.ps1 -RequireNonMain -Branch feature/my-change -AutoApply
+```
+
+## 3) Bootstrap manually
 
 ```powershell
 pwsh ./scripts/bootstrap.ps1 -Mode full
 ```
 
-Notas:
-- `-Mode clean` reduz instalação para cenário mais enxuto.
-- `-SkipInstall` aplica configs sem reinstalar ferramentas.
-- `-SkipMise` aplica bootstrap sem `mise install/doctor/ls`.
-- `-Modules core,shell,terminal` executa apenas módulos selecionados (dependências são resolvidas automaticamente).
-- O bootstrap instala um `profile shim` no caminho oficial do PowerShell (mesmo em OneDrive Documents), redirecionando para `~/.config/powershell`.
-- Se já existir profile, o script pede confirmação e salva backup antes de substituir.
-- Para restaurar profile anterior: `pwsh ./scripts/install-profile-shim.ps1 -Action reset`.
+Useful options:
 
-## 4) Fluxo seguro de update/apply
+- `-Mode clean`
+- `-SkipInstall`
+- `-SkipMise`
+- `-Modules core,shell,terminal`
+- `-IncludeSecretsChecks`
 
-Wrapper recomendado para operação diária:
+## 4) Day-2 commands
 
 ```powershell
 pwsh ./scripts/windots.ps1 -Command update
-```
-
-Outros comandos disponíveis:
-
-```powershell
 pwsh ./scripts/windots.ps1 -Command apply
 pwsh ./scripts/windots.ps1 -Command bootstrap -Mode clean
+pwsh ./scripts/windots.ps1 -Command restore -RestoreConfigPath "$env:LOCALAPPDATA\windots\state\restore.json"
 pwsh ./scripts/windots.ps1 -Command validate
 ```
 
-## 5) Validar consistência e segredos
+## 5) Validate
 
 ```powershell
-pwsh ./scripts/validate.ps1
-pwsh ./scripts/validate-modules.ps1
+pwsh -NoProfile -File ./scripts/validate.ps1
+pwsh -NoProfile -File ./scripts/validate-modules.ps1
+pwsh -NoProfile -File ./tests/run.ps1
 ```
 
-## 6) Confirmar toolchain mise
+## 6) Module-owned utility scripts
 
-```powershell
-mise install
-mise doctor
-mise ls
-```
+- Profile shim:
+  - `pwsh ./modules/shell/profile-shim.ps1 -Action status`
+  - `pwsh ./modules/shell/profile-shim.ps1 -Action reset`
+- AI config sync:
+  - `pwsh ./modules/ai/link-configs.ps1`
+  - `pwsh ./modules/ai/link-configs.ps1 -UseSymlink`
+- Secrets:
+  - `pwsh ./modules/secrets/migrate.ps1`
+  - `pwsh ./modules/secrets/deps-check.ps1`
 
-## 7) Sincronizar AI configs manualmente (opcional)
+## 7) Winget behavior
 
-```powershell
-pwsh ./scripts/link-ai-configs.ps1
-# ou
-pwsh ./scripts/link-ai-configs.ps1 -UseSymlink
-```
+`winget` installs/upgrades are mediated by `scripts/common/winget.ps1`.
 
-## Pós-update do Windows Terminal
+- Source is forced to `winget`
+- `msstore` certificate/source failures trigger automatic fallback
+- Commands are logged and fail fast when retries are exhausted
 
-Após `chezmoi apply`/`chezmoi update`, um hook pós-execução replica automaticamente:
-
-- origem: `~/.config/windows-terminal/settings.json`
-- destino: `~/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`
-- implementação: `home/.chezmoiscripts/run_after_40-sync-windows-terminal.ps1.tmpl`
-
-## Oh My Posh (tema + fonte)
-
-O bootstrap chama `scripts/setup-oh-my-posh.ps1` para preparar:
-
-- tema `catppuccin_mocha.omp.json` em `POSH_THEMES_PATH`
-- fonte Nerd Font JetBrains Mono (com fallback de instalação)
-
-## Referências
-
-- [README](../README.md)
-- [Segredos](./SECRETS.md)
-- [Perfil PowerShell](../home/dot_config/powershell/docs/README.md)
+Restore config contract and examples are documented in `docs/RESTORE.md`.

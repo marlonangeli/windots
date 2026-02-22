@@ -1,40 +1,62 @@
 # Decisions
 
-## Estratégia de configuração
+## Core Approach
 
-- Base: `chezmoi` para templates e aplicação declarativa.
-- Automação: scripts PowerShell em `scripts/` para bootstrap, validação e migração.
-- Orquestração: execução por módulos com registry declarativo em `scripts/modules/module-registry.ps1`.
-- Perfil shell: modular em `home/dot_config/powershell/modules/`.
-- Toolchain CLI: preferência por `mise` (winget focado em sistema/GUI e exceções).
+- `chezmoi` is the source-of-truth for dotfile templates under `home/`.
+- PowerShell scripts orchestrate install/bootstrap/validation.
+- Execution is module-based and dependency-resolved through `modules/module-registry.ps1`.
+- Preflight checks run before install/update/restore flows via `scripts/common/preflight.ps1`.
 
-## Contratos estáveis
+## Installer Contracts
 
-- `install.ps1` é o entrypoint remoto canônico e delega para `scripts/install.ps1`.
-- `scripts/bootstrap.ps1` mantém interface principal e delega para `scripts/run-modules.ps1`.
-- `scripts/validate.ps1` continua gate obrigatório local/CI.
+- Root canonical entrypoint: `install.ps1`
+- Single installer implementation: `install.ps1`
 
-## Modelo de módulos
+Installer supports:
 
-- Cada módulo declara dependências, categoria e entrypoint.
-- Resolução de ordem é determinística e validada por `scripts/validate-modules.ps1`.
-- Fluxo interativo usa `Read-Host` como baseline; `gum` é opcional para UX melhor.
+- action menu (`INSTALL`, `UPDATE`, `RESTORE`, `QUIT`) in interactive mode
+- `-Action install|update|restore|quit` for automation
+- `-Repo`
+- `-Branch`
+- `-Ref` (overrides `-Branch`)
+- `-LocalRepoPath`
 
-## Segurança
+## Module Contracts
 
-- Segredos não versionados no Git.
-- Verificações automáticas em `scripts/validate.ps1`.
-- Migração de legados em `scripts/migrate-secrets.ps1`.
-- Preferência por cofre externo (Bitwarden CLI) e arquivos locais privados.
+Each module has:
 
-## Escopo atual
+- name
+- dependencies
+- modes (`full`, `clean`)
+- script path
+- entry function
 
-- PowerShell, Windows Terminal, Git, Zed
-- Codex/Copilot/MCP em `home/dot_config/ai/`
-- Configurações selecionadas em `.config` (`jira`, `mise`, `opencode`)
+Entrypoints are located at `modules/<module>/module.ps1`.
 
-## Referências
+## Package Management
 
-- [README](../README.md)
-- [Setup](./SETUP.md)
-- [PowerShell docs](../home/dot_config/powershell/docs/README.md)
+Dependencies are declared in `modules/packages/repository.psd1`.
+
+- Provider `winget` for system/apps
+- Provider `mise` for CLI toolchain items
+
+Each module installs/verifies only packages mapped to that module.
+Interactive runs can prompt for module package defaults vs specific package selection.
+
+## Winget Reliability
+
+All `winget install/upgrade` calls go through `scripts/common/winget.ps1`.
+
+Enforced behavior:
+
+- `--source winget`
+- agreement flags
+- fallback for msstore certificate/source errors (`0x8a15005e`)
+
+## Validation and Idempotency
+
+- `scripts/validate.ps1` is the local integrity gate.
+- `scripts/validate-modules.ps1` validates registry and dependency topology.
+- `scripts/windots.ps1 -Command update` runs `chezmoi update`, post-bootstrap, validation, and `chezmoi verify`.
+- `scripts/windots.ps1 -Command restore` replays installer/bootstrap from restore config and environment-backed secret references.
+- `tests/run.ps1` runs validate + lint + pester + integration apply/verify/idempotency.

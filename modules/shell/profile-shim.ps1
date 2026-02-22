@@ -15,13 +15,14 @@ $sourceRoot = Join-Path $HOME ".config\powershell"
 $legacySourceRoot = Join-Path $HOME "home\.config\powershell"
 $sourceProfile = Join-Path $sourceRoot "Microsoft.PowerShell_profile.ps1"
 $legacySourceProfile = Join-Path $legacySourceRoot "Microsoft.PowerShell_profile.ps1"
-$repoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$scriptsRoot = Join-Path $repoRoot "scripts"
 $repoProfileRoot = Join-Path $repoRoot "home\dot_config\powershell"
 $backupRoot = Join-Path $sourceRoot "profile-backups"
 $metaFile = Join-Path $backupRoot "latest-backup.json"
 $shimMarker = "Auto-generated shim. Do not place custom logic here."
 
-. (Join-Path $PSScriptRoot "common\logging.ps1")
+. (Join-Path $scriptsRoot "common\logging.ps1")
 
 function Ensure-BaseFolders {
     if (-not (Test-Path $targetDir)) { New-Item -ItemType Directory -Path $targetDir -Force | Out-Null }
@@ -97,7 +98,7 @@ if (Test-Path "$sourceProfile") {
 
     Set-Content -Path $targetProfile -Value $shim -Encoding UTF8
     Log-Info "Profile shim installed: $targetProfile"
-    Log-Info "To rollback: pwsh ./scripts/install-profile-shim.ps1 -Action reset"
+    Log-Info "To rollback: pwsh ./modules/shell/profile-shim.ps1 -Action reset"
 }
 
 function Reset-Profile {
@@ -134,7 +135,7 @@ function Reset-Profile {
 
     Copy-Item -Path $selectedBackup -Destination $targetProfile -Force
     Log-Info "Profile restored from backup."
-    Log-Info "If needed, reinstall shim later with: pwsh ./scripts/install-profile-shim.ps1 -Action install"
+    Log-Info "If needed, reinstall shim with: pwsh ./modules/shell/profile-shim.ps1 -Action install"
 }
 
 function Show-Status {
@@ -148,7 +149,7 @@ function Show-Status {
     Log-Info "Target exists: $exists"
     Log-Info "Target is shim: $isShim"
     if ($latest) { Log-Info "Latest backup: $latest" }
-    Log-Info "Reset command: pwsh ./scripts/install-profile-shim.ps1 -Action reset"
+    Log-Info "Reset command: pwsh ./modules/shell/profile-shim.ps1 -Action reset"
 }
 
 switch ($Action) {

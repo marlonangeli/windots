@@ -28,7 +28,6 @@ home/dot_config/powershell/
     worktrees.psm1
     time-tracker.psm1
     pr-workflow.psm1
-  Scripts/install-shell.ps1
   docs/
 ```
 

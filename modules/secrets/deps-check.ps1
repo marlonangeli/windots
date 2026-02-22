@@ -2,9 +2,10 @@
 param()
 
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$scriptsRoot = Join-Path $repoRoot "scripts"
 
-. (Join-Path $PSScriptRoot "common\logging.ps1")
+. (Join-Path $scriptsRoot "common\logging.ps1")
 
 function Write-Status {
     param(
@@ -59,7 +60,7 @@ $jiraCfg = Join-Path $repoRoot "home\dot_config\jira\.config.yml.tmpl"
 if (Test-Path $jiraCfg) {
     $content = Get-Content $jiraCfg -Raw
     $ok = $content -match 'token:\s*""'
-    $jiraTemplateMessage = if ($ok) { "empty token placeholder only" } else { "review token field in Jira template" }
+    $jiraTemplateMessage = if ($ok) { "empty token placeholder only" } else { "inspect token field in Jira template" }
     Write-Status -Name "Jira template token placeholder" -Ok $ok -Message $jiraTemplateMessage
 }
 

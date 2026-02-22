@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param()
 
-$scriptsRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$scriptsRoot = Join-Path $repoRoot "scripts"
+
 . (Join-Path $scriptsRoot "common\logging.ps1")
 
 function Invoke-WindotsModuleValidate {

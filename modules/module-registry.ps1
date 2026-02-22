@@ -15,7 +15,7 @@ function Get-WindotsModuleRegistry {
             RequiresElevation = $false
             Optional = $false
             Modes = @("full", "clean")
-            ScriptPath = (Join-Path $ScriptsRoot "modules\core.ps1")
+            ScriptPath = (Join-Path $ScriptsRoot "modules\core\module.ps1")
             EntryFunction = "Invoke-WindotsModuleCore"
         },
         [pscustomobject]@{
@@ -25,7 +25,7 @@ function Get-WindotsModuleRegistry {
             RequiresElevation = $false
             Optional = $true
             Modes = @("full", "clean")
-            ScriptPath = (Join-Path $ScriptsRoot "modules\packages.ps1")
+            ScriptPath = (Join-Path $ScriptsRoot "modules\packages\module.ps1")
             EntryFunction = "Invoke-WindotsModulePackages"
         },
         [pscustomobject]@{
@@ -35,17 +35,27 @@ function Get-WindotsModuleRegistry {
             RequiresElevation = $false
             Optional = $false
             Modes = @("full", "clean")
-            ScriptPath = (Join-Path $ScriptsRoot "modules\shell.ps1")
+            ScriptPath = (Join-Path $ScriptsRoot "modules\shell\module.ps1")
             EntryFunction = "Invoke-WindotsModuleShell"
         },
         [pscustomobject]@{
-            Name = "themes"
-            DependsOn = @("core")
+            Name = "development"
+            DependsOn = @("core", "packages")
             Category = "action"
             RequiresElevation = $false
             Optional = $true
             Modes = @("full", "clean")
-            ScriptPath = (Join-Path $ScriptsRoot "modules\themes.ps1")
+            ScriptPath = (Join-Path $ScriptsRoot "modules\development\module.ps1")
+            EntryFunction = "Invoke-WindotsModuleDevelopment"
+        },
+        [pscustomobject]@{
+            Name = "themes"
+            DependsOn = @("shell")
+            Category = "action"
+            RequiresElevation = $false
+            Optional = $true
+            Modes = @("full", "clean")
+            ScriptPath = (Join-Path $ScriptsRoot "modules\themes\module.ps1")
             EntryFunction = "Invoke-WindotsModuleThemes"
         },
         [pscustomobject]@{
@@ -55,7 +65,7 @@ function Get-WindotsModuleRegistry {
             RequiresElevation = $false
             Optional = $false
             Modes = @("full", "clean")
-            ScriptPath = (Join-Path $ScriptsRoot "modules\terminal.ps1")
+            ScriptPath = (Join-Path $ScriptsRoot "modules\terminal\module.ps1")
             EntryFunction = "Invoke-WindotsModuleTerminal"
         },
         [pscustomobject]@{
@@ -65,7 +75,7 @@ function Get-WindotsModuleRegistry {
             RequiresElevation = $false
             Optional = $true
             Modes = @("full", "clean")
-            ScriptPath = (Join-Path $ScriptsRoot "modules\ai.ps1")
+            ScriptPath = (Join-Path $ScriptsRoot "modules\ai\module.ps1")
             EntryFunction = "Invoke-WindotsModuleAI"
         },
         [pscustomobject]@{
@@ -75,7 +85,7 @@ function Get-WindotsModuleRegistry {
             RequiresElevation = $false
             Optional = $true
             Modes = @("full", "clean")
-            ScriptPath = (Join-Path $ScriptsRoot "modules\mise.ps1")
+            ScriptPath = (Join-Path $ScriptsRoot "modules\mise\module.ps1")
             EntryFunction = "Invoke-WindotsModuleMise"
         },
         [pscustomobject]@{
@@ -85,7 +95,7 @@ function Get-WindotsModuleRegistry {
             RequiresElevation = $false
             Optional = $true
             Modes = @("full", "clean")
-            ScriptPath = (Join-Path $ScriptsRoot "modules\secrets.ps1")
+            ScriptPath = (Join-Path $ScriptsRoot "modules\secrets\module.ps1")
             EntryFunction = "Invoke-WindotsModuleSecrets"
         },
         [pscustomobject]@{
@@ -95,7 +105,7 @@ function Get-WindotsModuleRegistry {
             RequiresElevation = $false
             Optional = $true
             Modes = @("full", "clean")
-            ScriptPath = (Join-Path $ScriptsRoot "modules\validate.ps1")
+            ScriptPath = (Join-Path $ScriptsRoot "modules\validate\module.ps1")
             EntryFunction = "Invoke-WindotsModuleValidate"
         }
     )
@@ -108,13 +118,12 @@ function Get-WindotsDefaultModules {
         [string]$Mode = "full"
     )
 
-    # TODO: ambos os modos tem tudo, validar para clean ter apenas o necessário
     switch ($Mode) {
         "full" {
-            return @("core", "packages", "shell", "themes", "terminal", "ai", "mise")
+            return @("core", "packages", "shell", "development", "themes", "terminal", "ai", "mise")
         }
         "clean" {
-            return @("core", "packages", "shell", "themes", "terminal", "ai", "mise")
+            return @("core", "packages", "shell", "themes", "terminal")
         }
         default {
             throw "Unsupported mode: $Mode"
@@ -133,7 +142,6 @@ function Resolve-WindotsModuleExecutionPlan {
 
     $registry = Get-WindotsModuleRegistry -ScriptsRoot $ScriptsRoot
     $byName = @{}
-
     foreach ($module in $registry) {
         $key = $module.Name.ToLowerInvariant()
         if ($byName.ContainsKey($key)) {
@@ -149,24 +157,21 @@ function Resolve-WindotsModuleExecutionPlan {
         Get-WindotsDefaultModules -Mode $Mode
     }
 
-    if (-not $requested -or $requested.Count -eq 0) {
-        return @()
-    }
-
-    $requestedNormalized = @(
+    $normalized = @(
         $requested |
             ForEach-Object { $_.ToString().Trim().ToLowerInvariant() } |
-            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Unique
     )
 
-    if ($requestedNormalized.Count -eq 0) {
+    if (-not $normalized -or $normalized.Count -eq 0) {
         return @()
     }
 
     $expanded = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
-    $addWithDeps = {
-        param([string]$ModuleName)
+    function Add-ModuleWithDependencies {
+        param([Parameter(Mandatory)][string]$ModuleName)
 
         if (-not $byName.ContainsKey($ModuleName)) {
             throw "Unknown module requested: $ModuleName"
@@ -178,50 +183,48 @@ function Resolve-WindotsModuleExecutionPlan {
 
         $null = $expanded.Add($ModuleName)
         foreach ($dep in $byName[$ModuleName].DependsOn) {
-            $depKey = $dep.ToString().Trim().ToLowerInvariant()
-            & $addWithDeps $depKey
+            Add-ModuleWithDependencies -ModuleName $dep.ToLowerInvariant()
         }
     }
 
-    foreach ($moduleName in $requestedNormalized) {
-        & $addWithDeps $moduleName
+    foreach ($name in $normalized) {
+        Add-ModuleWithDependencies -ModuleName $name
     }
 
     $visitState = @{}
-    $order = New-Object System.Collections.Generic.List[string]
+    $orderedNames = New-Object System.Collections.Generic.List[string]
 
-    $visit = {
-        param([string]$ModuleName)
+    function Visit-Module {
+        param([Parameter(Mandatory)][string]$ModuleName)
 
         $state = if ($visitState.ContainsKey($ModuleName)) { $visitState[$ModuleName] } else { 0 }
-
         if ($state -eq 2) { return }
         if ($state -eq 1) {
-            throw "Cyclic module dependency detected at module '$ModuleName'"
+            throw "Cyclic module dependency detected at '$ModuleName'"
         }
 
         $visitState[$ModuleName] = 1
         foreach ($dep in $byName[$ModuleName].DependsOn) {
-            $depKey = $dep.ToString().Trim().ToLowerInvariant()
+            $depKey = $dep.ToLowerInvariant()
             if ($expanded.Contains($depKey)) {
-                & $visit $depKey
+                Visit-Module -ModuleName $depKey
             }
         }
 
         $visitState[$ModuleName] = 2
-        if (-not $order.Contains($ModuleName)) {
-            $null = $order.Add($ModuleName)
+        if (-not $orderedNames.Contains($ModuleName)) {
+            $null = $orderedNames.Add($ModuleName)
         }
     }
 
-    foreach ($moduleName in $requestedNormalized) {
-        & $visit $moduleName
+    foreach ($name in $normalized) {
+        Visit-Module -ModuleName $name
     }
 
     $plan = @()
-    foreach ($name in $order) {
-        $module = $byName[$name]
-        if ($module.Modes -and $module.Modes.Count -gt 0 -and ($Mode -notin $module.Modes)) {
+    foreach ($moduleName in $orderedNames) {
+        $module = $byName[$moduleName]
+        if ($module.Modes -and $module.Modes.Count -gt 0 -and $Mode -notin $module.Modes) {
             throw "Module '$($module.Name)' is not available in mode '$Mode'"
         }
         $plan += $module
@@ -263,11 +266,15 @@ function Test-WindotsModuleRegistry {
         if (-not (Test-Path $module.ScriptPath)) {
             $errors.Add("Missing module script for '$($module.Name)': $($module.ScriptPath)")
         }
+
+        if ([string]::IsNullOrWhiteSpace($module.EntryFunction)) {
+            $errors.Add("Missing entry function for module '$($module.Name)'")
+        }
     }
 
     foreach ($module in $registry) {
-        foreach ($dep in $module.DependsOn) {
-            $depKey = $dep.ToString().Trim().ToLowerInvariant()
+        foreach ($dependency in $module.DependsOn) {
+            $depKey = $dependency.ToString().Trim().ToLowerInvariant()
             if (-not $byName.ContainsKey($depKey)) {
                 $errors.Add("Module '$($module.Name)' depends on unknown module '$depKey'")
             }

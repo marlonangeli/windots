@@ -1,4 +1,3 @@
-# TODO: simplificar os parametros, utilizar enums de estados para skip e include, verificar a necessidade de todos os parametros, adicionar documentação e exemplos de uso
 [CmdletBinding()]
 param(
     [ValidateSet("full", "clean")]
@@ -20,7 +19,7 @@ $ErrorActionPreference = "Stop"
 
 $runnerPath = Join-Path $PSScriptRoot "run-modules.ps1"
 if (-not (Test-Path $runnerPath)) {
-    throw "run-modules script not found: $runnerPath"
+    throw "Missing module runner: $runnerPath"
 }
 
 $runnerArgs = @{
@@ -39,5 +38,8 @@ if ($Modules -and $Modules.Count -gt 0) {
 }
 
 & $runnerPath @runnerArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "Module runner failed with exit code $LASTEXITCODE"
+}
 
 Log-Info "Bootstrap complete."

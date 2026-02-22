@@ -1,4 +1,3 @@
-# TODO: definir valores padrao em arquivo de manifesto
 [CmdletBinding()]
 param(
     [string]$ThemeName = "catppuccin_mocha.omp.json",
@@ -7,21 +6,24 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "common\logging.ps1")
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$scriptsRoot = Join-Path $repoRoot "scripts"
+. (Join-Path $scriptsRoot "common\logging.ps1")
+. (Join-Path $scriptsRoot "common\winget.ps1")
 
 function Test-FontInstalled {
     param([Parameter(Mandatory)][string]$Pattern)
 
-    $paths = @(
+    $registryPaths = @(
         "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts",
         "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
     )
 
-    foreach ($p in $paths) {
-        if (-not (Test-Path $p)) { continue }
-        $props = Get-ItemProperty -Path $p
-        foreach ($item in $props.PSObject.Properties) {
-            if ($item.Name -match $Pattern) {
+    foreach ($path in $registryPaths) {
+        if (-not (Test-Path $path)) { continue }
+        $props = Get-ItemProperty -Path $path
+        foreach ($property in $props.PSObject.Properties) {
+            if ($property.Name -match $Pattern) {
                 return $true
             }
         }
@@ -31,7 +33,7 @@ function Test-FontInstalled {
 }
 
 if (-not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
-    Log-Warn "oh-my-posh not found. Install it first (winget: JanDeDobbeleer.OhMyPosh)."
+    Log-Warn "oh-my-posh not found. Install it first."
     return
 }
 
@@ -47,31 +49,21 @@ if (-not (Test-Path $themesPath)) {
 
 $themePath = Join-Path $themesPath $ThemeName
 if (-not (Test-Path $themePath)) {
-    Log-Warn "Theme not found locally, attempting to download: $ThemeName"
     $themeUrl = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/$ThemeName"
-    try {
-        Invoke-WebRequest -Uri $themeUrl -OutFile $themePath
-    }
-    catch {
-        Log-Warn "Failed to download theme from $themeUrl"
-    }
+    Log-Warn "Theme not found locally. Downloading: $themeUrl"
+    Invoke-WebRequest -Uri $themeUrl -OutFile $themePath -ErrorAction Stop
 }
 
 $fontInstalled = Test-FontInstalled -Pattern "JetBrainsMono.*Nerd Font"
 if (-not $fontInstalled) {
-    Log-Warn "Installing Nerd Font via oh-my-posh: $FontName"
+    Log-Warn "Nerd Font not detected. Installing '$FontName'."
     try {
         oh-my-posh font install $FontName
     }
     catch {
         Log-Warn "oh-my-posh font install failed. Falling back to winget package."
-        if (Get-Command winget -ErrorAction SilentlyContinue) {
-            winget install --id DEVCOM.JetBrainsMonoNerdFont --exact --accept-source-agreements --accept-package-agreements
-        }
+        Invoke-WingetInstall -Id "DEVCOM.JetBrainsMonoNerdFont"
     }
 }
 
 Log-Info "oh-my-posh ready. Theme path: $themePath"
-Log-Info "If font was newly installed, restart Windows Terminal to apply font cache updates."
-
-# TODO: ensure that oh-my-posh is configured in PROFILE, and that the theme is applied.

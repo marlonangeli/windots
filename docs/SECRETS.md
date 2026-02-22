@@ -1,33 +1,41 @@
 # Secrets
 
-## Regras
+## Rules
 
-- Nunca versionar tokens, chaves ou senhas.
-- Usar Bitwarden CLI (`bw`) para recuperação em runtime quando aplicável.
-- Manter overrides locais privados como `.local.*`.
-- Validar sempre antes de commit: `pwsh ./scripts/validate.ps1`.
-- Em mudanças na orquestração de módulos, validar também: `pwsh ./scripts/validate-modules.ps1`.
+- Never commit tokens, private keys, or passwords.
+- Use external secret storage (for example, Bitwarden) for runtime retrieval.
+- Keep local-only overrides outside tracked templates.
+- For restore config, keep only environment variable names (`secretEnv`) and never raw secret values.
+- Run validation before commit:
 
-## Itens sensíveis comuns
+```powershell
+pwsh -NoProfile -File ./scripts/validate.ps1
+```
+
+## Common sensitive paths
 
 - `~/.codex/auth.json`
-- `~/.jira_access_token` (legado; evitar)
+- `~/.jira_access_token` (legacy, avoid)
 - `~/.ssh/id_*`
-- credenciais em `.gitconfig` (ex.: `tfstoken=`)
-- tokens em configs de editor/CLI
+- credentials in `~/.gitconfig` (for example `tfstoken=`)
 
-## Fluxo recomendado de migração/rotação
+## Rotation and cleanup workflow
 
-1. Executar `pwsh ./scripts/migrate-secrets.ps1` para detectar legados.
-2. Executar `pwsh ./scripts/check-secrets-deps.ps1` para validar dependências e proteções do repositório.
-3. Revogar credenciais expostas.
-4. Gerar novas credenciais.
-5. Salvar no cofre (Bitwarden) e injetar por variável de ambiente/local privado.
+1. Run migration checks:
 
-## Referências
+```powershell
+pwsh ./modules/secrets/migrate.ps1
+pwsh ./modules/secrets/deps-check.ps1
+```
 
-- [Validação automática](../scripts/validate.ps1)
-- [Validação de módulos](../scripts/validate-modules.ps1)
-- [Migração de segredos](../scripts/migrate-secrets.ps1)
-- [Dependências de segredos](../scripts/check-secrets-deps.ps1)
-- [Gitignore do repositório](../.gitignore)
+2. Revoke exposed credentials.
+3. Create new credentials.
+4. Store them in secret manager and inject at runtime via environment or local untracked files.
+
+## Related files
+
+- `scripts/validate.ps1`
+- `modules/secrets/module.ps1`
+- `modules/secrets/migrate.ps1`
+- `modules/secrets/deps-check.ps1`
+- `.gitignore`
