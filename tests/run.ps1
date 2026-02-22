@@ -28,14 +28,17 @@ function Assert-Command {
 
 Invoke-Step -Name "Validate repository" -Action {
     & (Join-Path $repoRoot "scripts\validate.ps1")
-    if ($LASTEXITCODE -ne 0) {
-        throw "scripts/validate.ps1 failed with exit code $LASTEXITCODE"
+    if (-not $?) {
+        throw "scripts/validate.ps1 failed"
     }
 }
 
 if (-not $SkipLint) {
     Invoke-Step -Name "Lint PowerShell scripts (PSScriptAnalyzer)" -Action {
-        Assert-Command -Name "Invoke-ScriptAnalyzer"
+        if (-not (Get-Command Invoke-ScriptAnalyzer -ErrorAction SilentlyContinue)) {
+            Write-Warning "Skipping lint step: Invoke-ScriptAnalyzer not found. Install PSScriptAnalyzer or run with -SkipLint."
+            return
+        }
 
         $targets = @(
             (Join-Path $repoRoot "install.ps1"),

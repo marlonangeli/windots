@@ -78,20 +78,22 @@ if (-not $packageManifest.IsValid) {
     exit 2
 }
 
-$moduleValidationPath = Join-Path $PSScriptRoot "validate-modules.ps1"
-& $moduleValidationPath
-if ($LASTEXITCODE -ne 0) {
+$moduleValidation = Test-WindotsModuleRegistry -ScriptsRoot $repoRoot
+if (-not $moduleValidation.IsValid) {
+    foreach ($moduleError in $moduleValidation.Errors) {
+        Log-Error $moduleError
+    }
     exit 3
 }
 
 $patterns = @(
-    "ATATT",
-    "x-mcp-api-key",
-    "tfstoken\\s*=",
-    "token\\s*:\\s*\"(?!\")[^\"]+\"",
-    "gh[pousr]_[A-Za-z0-9_]{20,}",
-    "github_pat_[A-Za-z0-9_]{20,}",
-    "sk-(proj|live|test)-[A-Za-z0-9]{20,}"
+    'ATATT',
+    'x-mcp-api-key',
+    'tfstoken\s*=',
+    'token\s*:\s*"(?!")[^"]+"',
+    'gh[pousr]_[A-Za-z0-9_]{20,}',
+    'github_pat_[A-Za-z0-9_]{20,}',
+    'sk-(proj|live|test)-[A-Za-z0-9]{20,}'
 )
 
 $scanRoots = @(
