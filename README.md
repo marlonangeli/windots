@@ -1,113 +1,141 @@
 # windots
 
+```text  
+  $$\      $$\ $$$$$$\ $$\   $$\ $$$$$$$\   $$$$$$\ $$$$$$$$\  $$$$$$\
+  $$ | $\  $$ |\_$$  _|$$$\  $$ |$$  __$$\ $$  __$$\\__$$  __|$$  __$$\
+  $$ |$$$\ $$ |  $$ |  $$$$\ $$ |$$ |  $$ |$$ /  $$ |  $$ |   $$ /  \__|
+  $$ $$ $$\$$ |  $$ |  $$ $$\$$ |$$ |  $$ |$$ |  $$ |  $$ |   \$$$$$$\
+  $$$$  _$$$$ |  $$ |  $$ \$$$$ |$$ |  $$ |$$ |  $$ |  $$ |    \____$$\
+  $$$  / \$$$ |  $$ |  $$ |\$$$ |$$ |  $$ |$$ |  $$ |  $$ |   $$\   $$ |
+  $$  /   \$$ |$$$$$$\ $$ | \$$ |$$$$$$$  | $$$$$$  |  $$ |   \$$$$$$  |
+  \__/     \__|\______|\__|  \__|\_______/  \______/   \__|    \______/
+```
+
 Windows dotfiles managed with `chezmoi` and PowerShell automation.
 
-The project is module-driven, idempotent, and designed for repeatable local setup.
+The repo is module-driven, idempotent, and designed for repeatable machine setup.
+
+## Why windots
+
+- Single entrypoint (`install.ps1`) for first install and day-2 operations.
+- Guided action menu (`INSTALL`, `UPDATE`, `RESTORE`, `QUIT`) with non-interactive flags.
+- Module orchestration with explicit dependency order.
+- Preflight checks and validation gates to reduce setup drift and surprises.
 
 ## Requirements
 
-- Windows with `winget`
+- Windows with `winget` available
 - PowerShell 7+
 - Git
-- `chezmoi`
+- [`chezmoi`](https://www.chezmoi.io/)
+
+These are checked during installer preflight (`scripts/common/preflight.ps1`).
 
 Optional tools:
 
-- `mise`
-- `gum`
-- `bw`
+- [`mise`](https://mise.jdx.dev)
+- [`gum`](https://github.com/charmbracelet/gum)
+- [`bw`](https://bitwarden.com/help/cli/)
 
-## Entrypoints
+## Installation
 
-- Canonical remote entrypoint: `install.ps1` (repo root)
-- Single installer implementation: `install.ps1`
-
-Remote install:
+Canonical remote install:
 
 ```powershell
 irm https://windots.ilegna.dev/install | iex
 ```
 
-Interactive installer menu options:
-
-- `INSTALL`
-- `UPDATE`
-- `RESTORE`
-- `QUIT`
-
-For automation, pass `-Action install` with flags like `-AutoApply` and `-NoPrompt`.
-
-In interactive mode, package modules can prompt for default vs specific package selections (for example development runtimes like dotnet/node/bun/python).
-
-## Quick Start
+Direct GitHub raw fallback:
 
 ```powershell
-chezmoi init --apply <github-user>/windots
-pwsh ./scripts/bootstrap.ps1 -Mode full
-pwsh ./scripts/validate.ps1
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1")))
 ```
 
-Safe update workflow:
+Run locally:
 
 ```powershell
-pwsh ./scripts/windots.ps1 -Command update
+pwsh -NoProfile -File ./install.ps1
 ```
 
-Restore workflow from config:
+## Installer Actions
+
+Interactive menu:
+
+- `INSTALL`: installs prerequisites, initializes source, runs bootstrap/validation.
+- `UPDATE`: runs safe update flow (`chezmoi update` + bootstrap + validation + verify).
+- `RESTORE`: replays install/bootstrap from restore config + secret env references.
+- `QUIT`: exits without changes.
+
+Non-interactive examples:
 
 ```powershell
-pwsh ./scripts/windots.ps1 -Command restore -RestoreConfigPath "$env:LOCALAPPDATA\windots\state\restore.json"
+# unattended install
+pwsh -NoProfile -File ./install.ps1 -Action install -AutoApply -NoPrompt
+
+# unattended update
+pwsh -NoProfile -File ./install.ps1 -Action update -NoPrompt
+
+# unattended restore with explicit config
+pwsh -NoProfile -File ./install.ps1 -Action restore -RestoreConfigPath "$env:LOCALAPPDATA\windots\state\restore.json" -NoPrompt
 ```
 
-## Installer Source Selection
+Passing arguments from remote invocation:
 
-`install.ps1` supports testing from branches, refs, and local paths:
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1"))) -Action install -AutoApply -NoPrompt -Mode full
+```
+
+## Source Selection for Testing
+
+`install.ps1` supports testing from branch, ref, and local source:
 
 ```powershell
 # branch
 pwsh -NoProfile -File ./install.ps1 -Branch feature/my-change -AutoApply
 
-# commit or tag (overrides branch)
+# tag/commit (overrides branch)
 pwsh -NoProfile -File ./install.ps1 -Ref <sha-or-tag> -AutoApply
 
-# local repository (no push required)
-pwsh -NoProfile -File ./install.ps1 -LocalRepoPath C:\src\windots -AutoApply
+# local repository
+pwsh -NoProfile -File ./install.ps1 -LocalRepoPath "C:\src\windots" -AutoApply
 ```
 
-Safety guard for non-main testing:
+Safety guard for non-main validation:
 
 ```powershell
 pwsh -NoProfile -File ./install.ps1 -RequireNonMain -Branch feature/my-change -AutoApply
 ```
 
-## Module Architecture
+`-RequireNonMain` fails fast if you accidentally run against `main` without an explicit `-Ref` or `-LocalRepoPath`.
+
+## Architecture
 
 Module registry:
 
 - `modules/module-registry.ps1`
 
-Module entrypoints:
+High-level flow:
 
-- `modules/core/module.ps1`
-- `modules/packages/module.ps1`
-- `modules/shell/module.ps1`
-- `modules/development/module.ps1`
-- `modules/themes/module.ps1`
-- `modules/terminal/module.ps1`
-- `modules/ai/module.ps1`
-- `modules/mise/module.ps1`
-- `modules/secrets/module.ps1`
-- `modules/validate/module.ps1`
+```text
+install.ps1
+  -> scripts/windots.ps1 (update/restore paths)
+  -> scripts/bootstrap.ps1 (module runner entry)
+      -> scripts/run-modules.ps1
+          -> modules/<name>/module.ps1
+              -> modules/packages/manager.ps1 (when module declares packages)
+```
 
-Runner and orchestration:
+Main modules:
 
-- `scripts/run-modules.ps1`
-- `scripts/bootstrap.ps1`
-- `scripts/windots.ps1`
+- `core`: base orchestration and chezmoi apply workflow
+- `packages`: shared package operations
+- `shell`: PowerShell profile and shell tooling
+- `development`: runtime/toolchain selection (dotnet/node/bun/python)
+- `themes`, `terminal`, `ai`, `mise`, `secrets`, `validate`
 
-## Package Repository
+## Package Management
 
-Dependencies are declared in:
+Package source of truth:
 
 - `modules/packages/repository.psd1`
 
@@ -120,20 +148,34 @@ Manager:
 
 - `modules/packages/manager.ps1`
 
-Each module installs/verifies only the packages mapped to it in the repository manifest.
+How it works:
+
+- Each package declares provider, package id, module mapping, modes, and required/optional state.
+- Modules install only packages mapped to themselves.
+- Interactive flows can choose default package set or specific optional packages.
 
 ## Winget Contract
 
-All `winget install/upgrade` operations go through:
+All managed `winget install/upgrade` operations flow through:
 
 - `scripts/common/winget.ps1`
 
 Behavior:
 
 - Forces `--source winget`
-- Always adds source/package agreement flags
-- Adds fallback for msstore certificate/source failures (`0x8a15005e`)
-- Logs command + exit code and fails fast on unrecoverable errors
+- Appends source/package agreement flags
+- Handles msstore certificate/source fallback (`0x8a15005e`)
+- Logs command and exit code, fails fast on unrecoverable errors
+
+## Day-2 Commands
+
+```powershell
+pwsh ./scripts/windots.ps1 -Command update
+pwsh ./scripts/windots.ps1 -Command apply
+pwsh ./scripts/windots.ps1 -Command bootstrap -Mode clean
+pwsh ./scripts/windots.ps1 -Command restore -RestoreConfigPath "$env:LOCALAPPDATA\windots\state\restore.json"
+pwsh ./scripts/windots.ps1 -Command validate
+```
 
 ## Validation and Tests
 
@@ -144,27 +186,27 @@ pwsh -NoProfile -File ./scripts/validate.ps1
 pwsh -NoProfile -File ./scripts/validate-modules.ps1
 ```
 
-Local test runner:
+Full local test runner:
 
 ```powershell
 pwsh -NoProfile -File ./tests/run.ps1
 ```
 
-`tests/run.ps1` runs:
+`tests/run.ps1` covers:
 
 - repository validation
-- lint (`PSScriptAnalyzer`, if enabled)
-- Pester tests
-- integration sequence: `chezmoi apply`, `chezmoi verify`, second `chezmoi apply`, idempotency diff check
+- optional lint (`PSScriptAnalyzer`)
+- Pester test suite
+- integration idempotency sequence (`chezmoi apply/verify/apply/diff`)
 
 ## Repository Layout
 
 ```text
-home/      # chezmoi templates (source of truth)
-scripts/   # orchestrators, validation, shared helpers
-modules/   # per-module scripts and configs
-tests/     # local test runner, pester, sandbox assets
-docs/      # setup, migration, secrets, architecture notes
+home/      # chezmoi templates (dotfiles + app configs)
+scripts/   # installer/orchestration/validation/common helpers
+modules/   # module entrypoints + module-owned automation
+tests/     # smoke, pester, integration runner assets
+docs/      # operational docs and architecture notes
 ```
 
 ## Documentation

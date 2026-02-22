@@ -568,9 +568,31 @@ function Prompt-InstallerAction {
     [CmdletBinding()]
     param()
 
+    function Show-InstallerBanner {
+        $banner = @'
+        $$\      $$\ $$$$$$\ $$\   $$\ $$$$$$$\   $$$$$$\ $$$$$$$$\  $$$$$$\
+        $$ | $\  $$ |\_$$  _|$$$\  $$ |$$  __$$\ $$  __$$\\__$$  __|$$  __$$\
+        $$ |$$$\ $$ |  $$ |  $$$$\ $$ |$$ |  $$ |$$ /  $$ |  $$ |   $$ /  \__|
+        $$ $$ $$\$$ |  $$ |  $$ $$\$$ |$$ |  $$ |$$ |  $$ |  $$ |   \$$$$$$\
+        $$$$  _$$$$ |  $$ |  $$ \$$$$ |$$ |  $$ |$$ |  $$ |  $$ |    \____$$\
+        $$$  / \$$$ |  $$ |  $$ |\$$$ |$$ |  $$ |$$ |  $$ |  $$ |   $$\   $$ |
+        $$  /   \$$ |$$$$$$\ $$ | \$$ |$$$$$$$  | $$$$$$  |  $$ |   \$$$$$$  |
+        \__/     \__|\______|\__|  \__|\_______/  \______/   \__|    \______/
+'@
+
+        if ($Host.UI.SupportsVirtualTerminal) {
+            Write-Host "`e[38;5;39m$banner`e[0m"
+            return
+        }
+
+        Write-Host $banner -ForegroundColor Cyan
+    }
+
     if ($NoPrompt) {
         return "install"
     }
+
+    Show-InstallerBanner
 
     if (Test-GumAvailable) {
         try {

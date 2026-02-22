@@ -1,35 +1,43 @@
 # Setup
 
-## 1) Run the installer
+## Quick Install
 
-Canonical remote command:
+Remote entrypoint:
 
 ```powershell
 irm https://windots.ilegna.dev/install | iex
 ```
 
-Local file execution:
+Local execution:
 
 ```powershell
 pwsh -NoProfile -File ./install.ps1
 ```
 
-In interactive mode, installer execution shows the action menu:
+Direct GitHub raw fallback:
+
+```powershell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1")))
+```
+
+## Installer Actions
+
+Interactive menu options:
 
 - `INSTALL`
 - `UPDATE`
 - `RESTORE`
 - `QUIT`
 
-Use `-Action install -AutoApply` for full unattended flow.
-
-In interactive mode, package-heavy modules can prompt for default package set vs specific package selection.
+Non-interactive examples:
 
 ```powershell
 pwsh -NoProfile -File ./install.ps1 -Action install -AutoApply -NoPrompt
+pwsh -NoProfile -File ./install.ps1 -Action update -NoPrompt
+pwsh -NoProfile -File ./install.ps1 -Action restore -RestoreConfigPath "$env:LOCALAPPDATA\windots\state\restore.json" -NoPrompt
 ```
 
-## 2) Select source for testing
+## Source Selection for Testing
 
 ```powershell
 # branch
@@ -38,23 +46,23 @@ pwsh -NoProfile -File ./install.ps1 -Branch feature/my-change -AutoApply
 # commit/tag (overrides branch)
 pwsh -NoProfile -File ./install.ps1 -Ref <sha-or-tag> -AutoApply
 
-# local repository
-pwsh -NoProfile -File ./install.ps1 -LocalRepoPath C:\src\windots -AutoApply
+# local repository source
+pwsh -NoProfile -File ./install.ps1 -LocalRepoPath "C:\src\windots" -AutoApply
 ```
 
-Optional guard:
+Safety guard to avoid accidental main-branch runs:
 
 ```powershell
 pwsh -NoProfile -File ./install.ps1 -RequireNonMain -Branch feature/my-change -AutoApply
 ```
 
-## 3) Bootstrap manually
+## Manual Bootstrap
 
 ```powershell
 pwsh ./scripts/bootstrap.ps1 -Mode full
 ```
 
-Useful options:
+Useful flags:
 
 - `-Mode clean`
 - `-SkipInstall`
@@ -62,7 +70,7 @@ Useful options:
 - `-Modules core,shell,terminal`
 - `-IncludeSecretsChecks`
 
-## 4) Day-2 commands
+## Day-2 Operations
 
 ```powershell
 pwsh ./scripts/windots.ps1 -Command update
@@ -72,7 +80,9 @@ pwsh ./scripts/windots.ps1 -Command restore -RestoreConfigPath "$env:LOCALAPPDAT
 pwsh ./scripts/windots.ps1 -Command validate
 ```
 
-## 5) Validate
+`update` and `apply` workflows both run validation and `chezmoi verify` after orchestration.
+
+## Validation
 
 ```powershell
 pwsh -NoProfile -File ./scripts/validate.ps1
@@ -80,24 +90,32 @@ pwsh -NoProfile -File ./scripts/validate-modules.ps1
 pwsh -NoProfile -File ./tests/run.ps1
 ```
 
-## 6) Module-owned utility scripts
+What is validated:
 
-- Profile shim:
+- required files and module contracts
+- module dependency graph
+- secret-pattern checks in managed script/template trees
+- idempotency via integration workflow in `tests/run.ps1`
+
+## Module Utility Scripts
+
+- Profile shim
   - `pwsh ./modules/shell/profile-shim.ps1 -Action status`
   - `pwsh ./modules/shell/profile-shim.ps1 -Action reset`
-- AI config sync:
+- AI config sync
   - `pwsh ./modules/ai/link-configs.ps1`
   - `pwsh ./modules/ai/link-configs.ps1 -UseSymlink`
-- Secrets:
+- Secrets helpers
   - `pwsh ./modules/secrets/migrate.ps1`
   - `pwsh ./modules/secrets/deps-check.ps1`
 
-## 7) Winget behavior
+## Winget Behavior
 
-`winget` installs/upgrades are mediated by `scripts/common/winget.ps1`.
+Managed `winget` operations are routed through `scripts/common/winget.ps1`.
 
-- Source is forced to `winget`
-- `msstore` certificate/source failures trigger automatic fallback
-- Commands are logged and fail fast when retries are exhausted
+- source forced to `winget`
+- agreement flags appended by default
+- fallback path for msstore certificate/source failures
+- operation logging and explicit exit-code handling
 
-Restore config contract and examples are documented in `docs/RESTORE.md`.
+For restore config contract and examples, see `docs/RESTORE.md`.

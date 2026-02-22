@@ -3,25 +3,25 @@
 ## Rules
 
 - Never commit tokens, private keys, or passwords.
-- Use external secret storage (for example, Bitwarden) for runtime retrieval.
-- Keep local-only overrides outside tracked templates.
-- For restore config, keep only environment variable names (`secretEnv`) and never raw secret values.
-- Run validation before commit:
+- Keep secrets in external stores (for example Bitwarden) and inject at runtime.
+- Keep host-specific overrides outside tracked templates (`*.local.*`, private files, env vars).
+- In restore config, store only environment variable names in `secretEnv`, never secret values.
+
+Validate before commit:
 
 ```powershell
 pwsh -NoProfile -File ./scripts/validate.ps1
 ```
 
-## Common sensitive paths
+## Sensitive Paths To Watch
 
 - `~/.codex/auth.json`
-- `~/.jira_access_token` (legacy, avoid)
 - `~/.ssh/id_*`
-- credentials in `~/.gitconfig` (for example `tfstoken=`)
+- credential-bearing entries in `~/.gitconfig`
 
-## Rotation and cleanup workflow
+## Rotation and Cleanup Workflow
 
-1. Run migration checks:
+1. Run repository checks:
 
 ```powershell
 pwsh ./modules/secrets/migrate.ps1
@@ -29,10 +29,10 @@ pwsh ./modules/secrets/deps-check.ps1
 ```
 
 2. Revoke exposed credentials.
-3. Create new credentials.
-4. Store them in secret manager and inject at runtime via environment or local untracked files.
+3. Create replacement credentials.
+4. Store replacements in secret manager and reinject via environment/local untracked files.
 
-## Related files
+## Related Files
 
 - `scripts/validate.ps1`
 - `modules/secrets/module.ps1`
