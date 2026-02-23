@@ -38,8 +38,8 @@ if ($Modules -and $Modules.Count -gt 0) {
 }
 
 & $runnerPath @runnerArgs
-if ($LASTEXITCODE -ne 0) {
-    throw "Module runner failed with exit code $LASTEXITCODE"
+if (-not $?) {
+    throw "Module runner failed"
 }
 
 Log-Info "Bootstrap complete."

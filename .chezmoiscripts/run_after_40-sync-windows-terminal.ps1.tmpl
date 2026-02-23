@@ -1,0 +1,342 @@
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = "Stop"
+
+function ConvertTo-WindotsHashtable {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    if ($Value -is [System.Collections.IDictionary]) {
+        $map = [ordered]@{}
+        foreach ($key in $Value.Keys) {
+            $map[$key] = ConvertTo-WindotsHashtable -Value $Value[$key]
+        }
+        return $map
+    }
+
+    if ($Value -is [System.Management.Automation.PSCustomObject]) {
+        $map = [ordered]@{}
+        foreach ($property in $Value.PSObject.Properties) {
+            $map[$property.Name] = ConvertTo-WindotsHashtable -Value $property.Value
+        }
+        return $map
+    }
+
+    if ($Value -is [System.Collections.IEnumerable] -and -not ($Value -is [string])) {
+        $items = @()
+        foreach ($item in $Value) {
+            $items += ,(ConvertTo-WindotsHashtable -Value $item)
+        }
+        return $items
+    }
+
+    return $Value
+}
+
+function Ensure-WindotsArray {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return @()
+    }
+
+    if ($Value -is [array]) {
+        return @($Value)
+    }
+
+    return @($Value)
+}
+
+function ConvertTo-WindotsIdentity {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return ""
+    }
+
+    if ($Value -is [array]) {
+        return (($Value | ForEach-Object { [string]$_ }) -join "+")
+    }
+
+    return [string]$Value
+}
+
+function Test-WindotsItemMatch {
+    param(
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Left,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Right,
+        [Parameter(Mandatory)][string[]]$Keys
+    )
+
+    foreach ($key in $Keys) {
+        if (-not $Left.ContainsKey($key) -or -not $Right.ContainsKey($key)) {
+            continue
+        }
+
+        $leftValue = ConvertTo-WindotsIdentity -Value $Left[$key]
+        $rightValue = ConvertTo-WindotsIdentity -Value $Right[$key]
+        if (-not [string]::IsNullOrWhiteSpace($leftValue) -and $leftValue -eq $rightValue) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Merge-WindotsArrayByIdentity {
+    param(
+        [Parameter(Mandatory)][object[]]$TargetItems,
+        [Parameter(Mandatory)][object[]]$SourceItems,
+        [Parameter(Mandatory)][string[]]$Keys
+    )
+
+    $merged = @($TargetItems)
+    $added = 0
+
+    foreach ($rawItem in $SourceItems) {
+        if (-not ($rawItem -is [System.Collections.IDictionary])) {
+            continue
+        }
+
+        $sourceItem = [System.Collections.IDictionary]$rawItem
+        $exists = $false
+
+        foreach ($existingRaw in $merged) {
+            if (-not ($existingRaw -is [System.Collections.IDictionary])) {
+                continue
+            }
+
+            $existingItem = [System.Collections.IDictionary]$existingRaw
+            if (Test-WindotsItemMatch -Left $existingItem -Right $sourceItem -Keys $Keys) {
+                $exists = $true
+                break
+            }
+        }
+
+        if (-not $exists) {
+            $merged += ,$sourceItem
+            $added++
+        }
+    }
+
+    return [pscustomobject]@{
+        Items = @($merged)
+        Added = $added
+    }
+}
+
+function Set-WindotsIfMissing {
+    param(
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Target,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Source,
+        [Parameter(Mandatory)][string]$Key
+    )
+
+    if (-not $Source.ContainsKey($Key)) {
+        return
+    }
+
+    if (-not $Target.ContainsKey($Key) -or $null -eq $Target[$Key]) {
+        $Target[$Key] = $Source[$Key]
+    }
+}
+
+function Test-WindotsTruthy {
+    param([string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $false
+    }
+
+    return ($Value -match '^(1|true|yes|y)$')
+}
+
+function Resolve-WindotsBackupPreference {
+    param([bool]$DefaultValue = $true)
+
+    $processValue = [Environment]::GetEnvironmentVariable("CHEZMOI_WT_BACKUP", "Process")
+    if (-not [string]::IsNullOrWhiteSpace($processValue)) {
+        return (Test-WindotsTruthy -Value $processValue)
+    }
+
+    $userValue = [Environment]::GetEnvironmentVariable("CHEZMOI_WT_BACKUP", "User")
+    if (-not [string]::IsNullOrWhiteSpace($userValue)) {
+        return (Test-WindotsTruthy -Value $userValue)
+    }
+
+    return $DefaultValue
+}
+
+function Merge-WindotsTerminalSettings {
+    param(
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Source,
+        [Parameter(Mandatory)][System.Collections.IDictionary]$Target
+    )
+
+    foreach ($key in @('$help', '$schema', 'alwaysShowTabs', 'copyFormatting', 'copyOnSelect', 'defaultProfile', 'launchMode', 'newTabMenu', 'tabWidthMode', 'theme', 'windowingBehavior')) {
+        Set-WindotsIfMissing -Target $Target -Source $Source -Key $key
+    }
+
+    $targetActions = Ensure-WindotsArray -Value $(if ($Target.ContainsKey("actions")) { $Target["actions"] } else { @() })
+    $sourceActions = Ensure-WindotsArray -Value $(if ($Source.ContainsKey("actions")) { $Source["actions"] } else { @() })
+    $mergedActions = Merge-WindotsArrayByIdentity -TargetItems $targetActions -SourceItems $sourceActions -Keys @("id", "name")
+    $Target["actions"] = $mergedActions.Items
+
+    $targetKeys = Ensure-WindotsArray -Value $(if ($Target.ContainsKey("keybindings")) { $Target["keybindings"] } else { @() })
+    $sourceKeys = Ensure-WindotsArray -Value $(if ($Source.ContainsKey("keybindings")) { $Source["keybindings"] } else { @() })
+    $mergedKeys = Merge-WindotsArrayByIdentity -TargetItems $targetKeys -SourceItems $sourceKeys -Keys @("id", "keys")
+    $Target["keybindings"] = $mergedKeys.Items
+
+    if (-not $Target.ContainsKey("profiles") -or -not ($Target["profiles"] -is [System.Collections.IDictionary])) {
+        $Target["profiles"] = [ordered]@{}
+    }
+
+    $mergedProfiles = [pscustomobject]@{ Items = @(); Added = 0 }
+    if ($Source.ContainsKey("profiles") -and ($Source["profiles"] -is [System.Collections.IDictionary])) {
+        $sourceProfiles = [System.Collections.IDictionary]$Source["profiles"]
+        $targetProfiles = [System.Collections.IDictionary]$Target["profiles"]
+
+        if ($sourceProfiles.ContainsKey("defaults") -and ($sourceProfiles["defaults"] -is [System.Collections.IDictionary])) {
+            if (-not $targetProfiles.ContainsKey("defaults") -or -not ($targetProfiles["defaults"] -is [System.Collections.IDictionary])) {
+                $targetProfiles["defaults"] = [ordered]@{}
+            }
+
+            $targetDefaults = [System.Collections.IDictionary]$targetProfiles["defaults"]
+            $sourceDefaults = [System.Collections.IDictionary]$sourceProfiles["defaults"]
+            foreach ($defaultKey in $sourceDefaults.Keys) {
+                if (-not $targetDefaults.ContainsKey($defaultKey)) {
+                    $targetDefaults[$defaultKey] = $sourceDefaults[$defaultKey]
+                }
+            }
+        }
+
+        $targetProfileList = Ensure-WindotsArray -Value $(if ($targetProfiles.ContainsKey("list")) { $targetProfiles["list"] } else { @() })
+        $sourceProfileList = Ensure-WindotsArray -Value $(if ($sourceProfiles.ContainsKey("list")) { $sourceProfiles["list"] } else { @() })
+        $mergedProfiles = Merge-WindotsArrayByIdentity -TargetItems $targetProfileList -SourceItems $sourceProfileList -Keys @("guid", "name")
+        $targetProfiles["list"] = $mergedProfiles.Items
+        $Target["profiles"] = $targetProfiles
+    }
+
+    $targetSchemes = Ensure-WindotsArray -Value $(if ($Target.ContainsKey("schemes")) { $Target["schemes"] } else { @() })
+    $sourceSchemes = Ensure-WindotsArray -Value $(if ($Source.ContainsKey("schemes")) { $Source["schemes"] } else { @() })
+    $mergedSchemes = Merge-WindotsArrayByIdentity -TargetItems $targetSchemes -SourceItems $sourceSchemes -Keys @("name")
+    $Target["schemes"] = $mergedSchemes.Items
+
+    return [pscustomobject]@{
+        Result = $Target
+        AddedActions = $mergedActions.Added
+        AddedKeybindings = $mergedKeys.Added
+        AddedProfiles = $mergedProfiles.Added
+        AddedSchemes = $mergedSchemes.Added
+    }
+}
+
+$homeDir = [Environment]::GetFolderPath("UserProfile")
+$sources = @(
+    (Join-Path $homeDir ".config\windows-terminal\settings.json"),
+    (Join-Path $homeDir "home\.config\windows-terminal\settings.json")
+)
+$source = $sources | Where-Object { Test-Path $_ } | Select-Object -First 1
+$packagesRoot = Join-Path $homeDir "AppData\Local\Packages"
+
+if (-not $source) {
+    Write-Host "[wt-sync] source not found. Checked: $($sources -join ', ')" -ForegroundColor Yellow
+    exit 0
+}
+
+if (-not (Test-Path $packagesRoot)) {
+    Write-Host "[wt-sync] packages folder not found: $packagesRoot" -ForegroundColor Yellow
+    exit 0
+}
+
+$stableDir = Join-Path $packagesRoot "Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState"
+$targetDir = $stableDir
+
+if (-not (Test-Path $targetDir)) {
+    $fallback = Get-ChildItem -Path $packagesRoot -Directory -Filter "Microsoft.WindowsTerminal*" -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path (Join-Path $_.FullName "LocalState") } |
+        Sort-Object Name |
+        Select-Object -First 1
+
+    if ($fallback) {
+        $targetDir = Join-Path $fallback.FullName "LocalState"
+    }
+}
+
+if (-not (Test-Path $targetDir)) {
+    Write-Host "[wt-sync] destination not found (no Windows Terminal package folder)." -ForegroundColor Yellow
+    exit 0
+}
+
+$target = Join-Path $targetDir "settings.json"
+if (-not (Test-Path $targetDir)) {
+    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+}
+
+if (Test-Path $target) {
+    try {
+        $item = Get-Item $target -ErrorAction Stop
+        $item.IsReadOnly = $false
+        attrib -R $target 2>$null | Out-Null
+    }
+    catch {
+        Write-Warning "[wt-sync] unable to clear readonly attribute: $target"
+    }
+}
+
+try {
+    $sourceRaw = Get-Content -Path $source -Raw -ErrorAction Stop
+    $sourceData = ConvertTo-WindotsHashtable -Value ($sourceRaw | ConvertFrom-Json -ErrorAction Stop)
+}
+catch {
+    Write-Warning "[wt-sync] failed to parse source settings: $($_.Exception.Message)"
+    exit 0
+}
+
+$targetRaw = ""
+$targetData = [ordered]@{}
+
+if (Test-Path $target) {
+    try {
+        $targetRaw = Get-Content -Path $target -Raw -ErrorAction Stop
+        if (-not [string]::IsNullOrWhiteSpace($targetRaw)) {
+            $targetData = ConvertTo-WindotsHashtable -Value ($targetRaw | ConvertFrom-Json -ErrorAction Stop)
+        }
+    }
+    catch {
+        Write-Warning "[wt-sync] existing settings are not valid JSON. Skipping merge to avoid data loss."
+        exit 0
+    }
+}
+
+$merge = Merge-WindotsTerminalSettings -Source $sourceData -Target $targetData
+$newJson = $merge.Result | ConvertTo-Json -Depth 32
+
+if ((-not [string]::IsNullOrWhiteSpace($targetRaw)) -and $targetRaw.Trim() -eq $newJson.Trim()) {
+    Write-Host "[wt-sync] unchanged: $target" -ForegroundColor DarkGray
+    exit 0
+}
+
+$shouldBackup = Resolve-WindotsBackupPreference -DefaultValue $true
+if ($shouldBackup -and (Test-Path $target)) {
+    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $backupPath = Join-Path $targetDir ("settings.windots-backup-{0}.json" -f $timestamp)
+    Copy-Item -Path $target -Destination $backupPath -Force
+    Write-Host "[wt-sync] backup created: $backupPath" -ForegroundColor DarkGray
+}
+
+Set-Content -Path $target -Value $newJson -Encoding UTF8
+try {
+    $written = Get-Item $target -ErrorAction Stop
+    $written.IsReadOnly = $false
+    attrib -R $target 2>$null | Out-Null
+}
+catch {
+    Write-Warning "[wt-sync] file merged but failed to normalize writable attribute: $target"
+}
+
+Write-Host "[wt-sync] merged: $target (profiles +$($merge.AddedProfiles), actions +$($merge.AddedActions), keybindings +$($merge.AddedKeybindings), schemes +$($merge.AddedSchemes))" -ForegroundColor Green

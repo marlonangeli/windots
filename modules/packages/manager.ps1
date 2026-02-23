@@ -94,13 +94,6 @@ function Get-WindotsModulePackages {
     )
 }
 
-function Test-WindotsGumAvailable {
-    [CmdletBinding()]
-    param()
-
-    return ($null -ne (Get-Command gum -ErrorAction SilentlyContinue))
-}
-
 function Resolve-WindotsPackageSelection {
     [CmdletBinding()]
     param(
@@ -121,47 +114,21 @@ function Resolve-WindotsPackageSelection {
     }
 
     $defaultPrompt = "Install default package set for module '$Module'?"
-    $useDefaults = $true
-
-    if (Test-WindotsGumAvailable) {
-        try {
-            & gum confirm $defaultPrompt
-            $useDefaults = ($LASTEXITCODE -eq 0)
-        }
-        catch {
-            $useDefaults = $true
-        }
-    }
-    else {
-        $choice = Read-Host "$defaultPrompt (Y/n)"
-        if (-not [string]::IsNullOrWhiteSpace($choice) -and $choice -notin @("y", "Y", "yes", "YES")) {
-            $useDefaults = $false
-        }
-    }
+    $useDefaults = Confirm-WindotsChoice -Message $defaultPrompt -DefaultYes -NoPrompt:$NoPrompt
 
     if ($useDefaults) {
         return @($requiredNames + $optionalNames | Select-Object -Unique)
     }
 
     $selectedOptional = @()
-    if (Test-WindotsGumAvailable) {
-        try {
-            $selectedOptional = @(& gum choose --no-limit --header "Select optional packages for '$Module'" @optionalNames)
-        }
-        catch {
-            $selectedOptional = @()
-        }
-    }
-    else {
-        Log-Info "Optional packages for '$Module': $($optionalNames -join ', ')"
-        $raw = Read-Host "Enter comma-separated package names (empty for none)"
-        if (-not [string]::IsNullOrWhiteSpace($raw)) {
-            $selectedOptional = @(
-                $raw -split "," |
-                    ForEach-Object { $_.Trim() } |
-                    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-            )
-        }
+    Log-Info "Optional packages for '$Module': $($optionalNames -join ', ')"
+    $raw = Read-WindotsInput -Prompt "Enter comma-separated package names (empty for none)"
+    if (-not [string]::IsNullOrWhiteSpace($raw)) {
+        $selectedOptional = @(
+            $raw -split "," |
+                ForEach-Object { $_.Trim() } |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        )
     }
 
     $normalizedOptional = @(
@@ -249,35 +216,60 @@ function Ensure-WindotsModulePackages {
 
     foreach ($pkg in $packages) {
         $pkgHt = [hashtable]$pkg
+        $packageLabel = if ($pkgHt.Name) { $pkgHt.Name } else { $pkgHt.PackageId }
 
         if ($useSelectionFilter -and -not $pkgHt.Required) {
             if ($pkgHt.Name.ToLowerInvariant() -notin $normalizedSelected) {
-                Log-Info "[$Module] package skipped by selection: $($pkgHt.Name)"
+                Log-Package "package $packageLabel"
+                Log-Info "skipped by selection."
                 continue
             }
         }
 
-        $installed = Test-WindotsPackageInstalled -Package $pkgHt
-        if ($installed) {
-            Log-Info "[$Module] package already installed: $($pkgHt.Name)"
+        Log-Package "package $packageLabel"
+
+        if ($pkgHt.Provider -eq 'mise' -and -not (Get-Command mise -ErrorAction SilentlyContinue)) {
+            if ($pkgHt.Required) {
+                throw "required package '$packageLabel' needs mise, but mise is not available in PATH"
+            }
+
+            Log-Info "skipped: provider 'mise' is not available yet."
             continue
         }
 
-        if ($WhatIf) {
-            Log-Info "[$Module] WhatIf: would install package $($pkgHt.Name) via $($pkgHt.Provider)"
+        $installed = Test-WindotsPackageInstalled -Package $pkgHt
+        if ($installed) {
+            Log-Success "is installed."
             continue
         }
+
+        Log-Info "is not installed."
+
+        if ($WhatIf) {
+            Log-Output ("WhatIf: would install via provider '{0}'." -f $pkgHt.Provider)
+            continue
+        }
+
+        Log-Info "installing..."
 
         if (-not $pkgHt.Required) {
             try {
                 Install-WindotsPackage -Package $pkgHt
+                Log-Success "installed successfully."
             }
             catch {
-                Log-Warn "[$Module] optional package failed: $($pkgHt.Name). $($_.Exception.Message)"
+                Log-Warn ("failed to install (optional): {0}" -f $_.Exception.Message)
             }
             continue
         }
 
-        Install-WindotsPackage -Package $pkgHt
+        try {
+            Install-WindotsPackage -Package $pkgHt
+            Log-Success "installed successfully."
+        }
+        catch {
+            Log-Error ("failed to install: {0}" -f $_.Exception.Message)
+            throw
+        }
     }
 }

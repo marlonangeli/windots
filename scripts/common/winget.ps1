@@ -36,12 +36,18 @@ function Invoke-WindotsWingetRaw {
         throw "winget not found in PATH"
     }
 
-    Log-Info ("winget command: winget {0}" -f ($Args -join " "))
-    $output = & winget @Args 2>&1
-    $exitCode = $LASTEXITCODE
-    Log-Info ("winget exit code ({0}): {1}" -f $Operation, $exitCode)
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & winget @Args 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
 
     return [pscustomobject]@{
+        Operation = $Operation
         ExitCode = $exitCode
         Output = @($output)
         ErrorText = Get-WindotsWingetErrorText -Output $output

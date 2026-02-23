@@ -7,10 +7,10 @@ if (Test-Path $loggingPath) {
 }
 
 if (-not (Get-Command Log-Info -ErrorAction SilentlyContinue)) {
-    function Log-Info { param([Parameter(Mandatory)][string]$Message) Write-Host "[INFO] $Message" -ForegroundColor Gray }
-    function Log-Warn { param([Parameter(Mandatory)][string]$Message) Write-Host "[WARN] $Message" -ForegroundColor Yellow }
-    function Log-Error { param([Parameter(Mandatory)][string]$Message) Write-Host "[ERROR] $Message" -ForegroundColor Red }
-    function Log-Step { param([Parameter(Mandatory)][string]$Message) Write-Host "==> $Message" -ForegroundColor Cyan }
+    function Log-Info { param([Parameter(Mandatory)][string]$Message) Write-Host $Message -ForegroundColor White }
+    function Log-Warn { param([Parameter(Mandatory)][string]$Message) Write-Host $Message -ForegroundColor Yellow }
+    function Log-Error { param([Parameter(Mandatory)][string]$Message) Write-Host $Message -ForegroundColor Red }
+    function Log-Step { param([Parameter(Mandatory)][string]$Message) Write-Host ("  {0}" -f $Message) -ForegroundColor Cyan }
 }
 
 function Test-WindotsHttpEndpoint {

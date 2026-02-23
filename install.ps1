@@ -27,7 +27,6 @@ param(
 $ErrorActionPreference = "Stop"
 $script:CurrentStep = "bootstrap"
 $script:chezmoiExe = $null
-$startedTranscript = $false
 $script:InstallerBoundParameters = @{}
 foreach ($boundKey in $PSBoundParameters.Keys) {
     $script:InstallerBoundParameters[$boundKey] = $PSBoundParameters[$boundKey]
@@ -38,10 +37,86 @@ if ($loggerPath -and (Test-Path $loggerPath)) {
     . $loggerPath
 }
 else {
-    function Log-Info { param([Parameter(Mandatory)][string]$Message) Write-Host "[INFO] $Message" -ForegroundColor Gray }
-    function Log-Step { param([Parameter(Mandatory)][string]$Message) Write-Host "==> $Message" -ForegroundColor Cyan }
-    function Log-Warn { param([Parameter(Mandatory)][string]$Message) Write-Host "[WARN] $Message" -ForegroundColor Yellow }
-    function Log-Error { param([Parameter(Mandatory)][string]$Message) Write-Host "[ERROR] $Message" -ForegroundColor Red }
+    if (-not (Get-Variable -Name WindotsLogFilePath -Scope Global -ErrorAction SilentlyContinue)) {
+        $Global:WindotsLogFilePath = ""
+    }
+
+    function Set-WindotsLogFilePath {
+        param(
+            [Parameter(Mandatory)][string]$Path,
+            [switch]$Reset
+        )
+
+        $directory = Split-Path -Parent $Path
+        if (-not [string]::IsNullOrWhiteSpace($directory) -and -not (Test-Path $directory)) {
+            New-Item -ItemType Directory -Path $directory -Force | Out-Null
+        }
+
+        if ($Reset -or -not (Test-Path $Path)) {
+            Set-Content -Path $Path -Value "" -Encoding UTF8
+        }
+
+        $Global:WindotsLogFilePath = $Path
+    }
+
+    function Write-WindotsLogFileLine {
+        param(
+            [ValidateSet("INFO", "WARN", "ERROR")]
+            [string]$Level = "INFO",
+            [Parameter(Mandatory)][string]$Message
+        )
+
+        if ([string]::IsNullOrWhiteSpace($Global:WindotsLogFilePath)) {
+            return
+        }
+
+        Add-Content -Path $Global:WindotsLogFilePath -Value ("[{0}] {1}" -f $Level, $Message) -Encoding UTF8
+    }
+
+    function Write-WindotsFallbackLine {
+        param(
+            [Parameter(Mandatory)][string]$Message,
+            [Parameter(Mandatory)][ConsoleColor]$Color,
+            [ValidateSet("INFO", "WARN", "ERROR")]
+            [string]$Level = "INFO",
+            [int]$Indent = 0
+        )
+
+        Write-WindotsLogFileLine -Level $Level -Message $Message
+        $prefix = if ($Indent -gt 0) { " " * $Indent } else { "" }
+        Write-Host ("{0}{1}" -f $prefix, $Message) -ForegroundColor $Color
+    }
+
+    function Log-Info { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color White -Level "INFO" }
+    function Log-Step { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Cyan -Level "INFO" -Indent 2 }
+    function Log-Warn { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Yellow -Level "WARN" }
+    function Log-Error { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Red -Level "ERROR" }
+    function Log-Success { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Green -Level "INFO" }
+    function Log-Option { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Magenta -Level "INFO" -Indent 4 }
+    function Log-Output { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Gray -Level "INFO" -Indent 4 }
+    function Log-Module { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Blue -Level "INFO" -Indent 2 }
+    function Log-ModuleDescription { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Gray -Level "INFO" -Indent 4 }
+    function Log-Package { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color DarkCyan -Level "INFO" -Indent 4 }
+    function Read-WindotsInput {
+        param([Parameter(Mandatory)][string]$Prompt)
+        Write-WindotsLogFileLine -Level "INFO" -Message ("Input prompt: {0}" -f $Prompt)
+        Write-Host ("    Input: {0}" -f $Prompt) -ForegroundColor Magenta -NoNewline
+        Write-Host " " -NoNewline
+        return (Read-Host)
+    }
+    function Confirm-WindotsChoice {
+        param(
+            [Parameter(Mandatory)][string]$Message,
+            [switch]$DefaultYes,
+            [switch]$NoPrompt
+        )
+
+        if ($NoPrompt) { return [bool]$DefaultYes }
+        $hint = if ($DefaultYes) { "(Y/n)" } else { "(y/N)" }
+        $value = Read-WindotsInput -Prompt ("{0} {1}" -f $Message, $hint)
+        if ([string]::IsNullOrWhiteSpace($value)) { return [bool]$DefaultYes }
+        return ($value -in @("y", "Y", "yes", "YES"))
+    }
     function Log-NewLine { Write-Host "" }
 }
 
@@ -149,21 +224,41 @@ function Ensure-WingetPackage {
         $installed = ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($probe | Out-String)))
     }
 
+    Log-Package "package $Id"
     if ($installed) {
-        Log-Info "already installed: $Id"
+        Log-Success "is installed."
         return
     }
 
-    Log-Warn "installing: $Id"
-    if ($hasWingetWrapper) {
-        Invoke-WingetInstall -Id $Id
-        return
+    Log-Info "is not installed."
+    Log-Info "installing..."
+
+    try {
+        if ($hasWingetWrapper) {
+            Invoke-WingetInstall -Id $Id
+        }
+        else {
+            $previousPreference = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            try {
+                $null = winget install --id $Id --exact --source winget --accept-source-agreements --accept-package-agreements --silent 2>&1
+                $wingetExitCode = $LASTEXITCODE
+            }
+            finally {
+                $ErrorActionPreference = $previousPreference
+            }
+
+            if ($wingetExitCode -ne 0) {
+                throw "winget install failed for '$Id'"
+            }
+        }
+    }
+    catch {
+        Log-Error "failed to install."
+        throw
     }
 
-    winget install --id $Id --exact --source winget --accept-source-agreements --accept-package-agreements --silent
-    if ($LASTEXITCODE -ne 0) {
-        throw "winget install failed for '$Id'"
-    }
+    Log-Success "installed successfully."
 }
 
 function Refresh-ProcessPath {
@@ -208,8 +303,50 @@ function Invoke-Step {
     & $Action
 }
 
-function Test-GumAvailable {
-    return $null -ne (Get-Command gum -ErrorAction SilentlyContinue)
+function Invoke-NativeCommandSafely {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$CommandPath,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $CommandPath @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Output = @($output)
+    }
+}
+
+function Request-ShellReloadAndContinue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$CommandName,
+        [string]$Reason = "The command is not available in PATH yet."
+    )
+
+    Log-Warn $Reason
+    if ($NoPrompt) {
+        return $false
+    }
+
+    Log-Option "Reload your shell/terminal to refresh PATH entries."
+    Log-Option "After reloading, return here and continue."
+    $response = Read-WindotsInput -Prompt "Press Enter to retry, or type 'skip'"
+    if ($response -and $response.Trim().ToLowerInvariant() -eq "skip") {
+        return $false
+    }
+
+    Refresh-ProcessPath
+    return ($null -ne (Get-Command $CommandName -ErrorAction SilentlyContinue))
 }
 
 function Prompt-Confirm {
@@ -218,20 +355,7 @@ function Prompt-Confirm {
         [switch]$DefaultYes
     )
 
-    if ($NoPrompt) { return [bool]$DefaultYes }
-
-    if (Test-GumAvailable) {
-        try {
-            & gum confirm $Message
-            return ($LASTEXITCODE -eq 0)
-        }
-        catch {}
-    }
-
-    $hint = if ($DefaultYes) { "(Y/n)" } else { "(y/N)" }
-    $value = Read-Host "$Message $hint"
-    if ([string]::IsNullOrWhiteSpace($value)) { return [bool]$DefaultYes }
-    return $value -in @("y", "Y", "yes", "YES")
+    return (Confirm-WindotsChoice -Message $Message -DefaultYes:$DefaultYes -NoPrompt:$NoPrompt)
 }
 
 function Prompt-MultiSelect {
@@ -246,22 +370,12 @@ function Prompt-MultiSelect {
         return @()
     }
 
-    if (Test-GumAvailable) {
-        try {
-            $selected = & gum choose --no-limit --header $Message @Options
-            if ($LASTEXITCODE -eq 0 -and $selected) {
-                if ($selected -is [string]) { return @($selected) }
-                return @($selected | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-            }
-        }
-        catch {}
-    }
-
+    Log-Info $Message
     Log-Info "Available modules: $($Options -join ', ')"
     if ($Default -and $Default.Count -gt 0) {
         Log-Info "Default modules: $($Default -join ', ')"
     }
-    $raw = Read-Host "Enter comma-separated modules (empty for default)"
+    $raw = Read-WindotsInput -Prompt "Enter comma-separated modules (empty for default)"
     if ([string]::IsNullOrWhiteSpace($raw)) {
         return @($Default)
     }
@@ -281,19 +395,8 @@ function Prompt-OrDefault {
 
     if ($NoPrompt) { return $Default }
 
-    if (Test-GumAvailable) {
-        try {
-            $placeholder = if ([string]::IsNullOrWhiteSpace($Default)) { $Label } else { "$Label [$Default]" }
-            $value = & gum input --placeholder $placeholder
-            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($value)) {
-                return $value
-            }
-        }
-        catch {}
-    }
-
     $suffix = if ([string]::IsNullOrWhiteSpace($Default)) { "" } else { " [$Default]" }
-    $value = Read-Host "$Label$suffix"
+    $value = Read-WindotsInput -Prompt "$Label$suffix"
     if ([string]::IsNullOrWhiteSpace($value)) { return $Default }
     return $value
 }
@@ -315,12 +418,14 @@ function Set-InstallerEnvData {
     $github = Prompt-OrDefault -Label "GitHub username" -Default $defaultGithub
     $azureOrg = Prompt-OrDefault -Label "Azure DevOps organization URL (optional)" -Default ""
     $azureProject = Prompt-OrDefault -Label "Azure DevOps project (optional)" -Default ""
+    $backupTerminalSettings = Prompt-Confirm -Message "Backup existing Windows Terminal settings before merge?" -DefaultYes
 
     $env:CHEZMOI_NAME = $name
     $env:CHEZMOI_EMAIL = $email
     $env:CHEZMOI_GITHUB_USERNAME = $github
     $env:CHEZMOI_AZURE_ORG = $azureOrg
     $env:CHEZMOI_AZURE_PROJECT = $azureProject
+    $env:CHEZMOI_WT_BACKUP = if ($backupTerminalSettings) { "1" } else { "0" }
 }
 
 function Get-RepoRemotePattern {
@@ -569,23 +674,36 @@ function Prompt-InstallerAction {
     param()
 
     function Show-InstallerBanner {
-        $banner = @'
-        $$\      $$\ $$$$$$\ $$\   $$\ $$$$$$$\   $$$$$$\ $$$$$$$$\  $$$$$$\
-        $$ | $\  $$ |\_$$  _|$$$\  $$ |$$  __$$\ $$  __$$\\__$$  __|$$  __$$\
-        $$ |$$$\ $$ |  $$ |  $$$$\ $$ |$$ |  $$ |$$ /  $$ |  $$ |   $$ /  \__|
-        $$ $$ $$\$$ |  $$ |  $$ $$\$$ |$$ |  $$ |$$ |  $$ |  $$ |   \$$$$$$\
-        $$$$  _$$$$ |  $$ |  $$ \$$$$ |$$ |  $$ |$$ |  $$ |  $$ |    \____$$\
-        $$$  / \$$$ |  $$ |  $$ |\$$$ |$$ |  $$ |$$ |  $$ |  $$ |   $$\   $$ |
-        $$  /   \$$ |$$$$$$\ $$ | \$$ |$$$$$$$  | $$$$$$  |  $$ |   \$$$$$$  |
-        \__/     \__|\______|\__|  \__|\_______/  \______/   \__|    \______/
+        $bannerPath = if ($PSScriptRoot) { Join-Path $PSScriptRoot "banner.txt" } else { "banner.txt" }
+        $banner = ""
+        if (Test-Path $bannerPath) {
+            $banner = Get-Content -Path $bannerPath -Raw
+        }
+
+        if ([string]::IsNullOrWhiteSpace($banner)) {
+            $banner = @'
+██╗    ██╗██╗███╗   ██╗██████╗  ██████╗ ████████╗███████╗
+██║    ██║██║████╗  ██║██╔══██╗██╔═══██╗╚══██╔══╝██╔════╝
+██║ █╗ ██║██║██╔██╗ ██║██║  ██║██║   ██║   ██║   ███████╗
+██║███╗██║██║██║╚██╗██║██║  ██║██║   ██║   ██║   ╚════██║
+╚███╔███╔╝██║██║ ╚████║██████╔╝╚██████╔╝   ██║   ███████║
+ ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═════╝  ╚═════╝    ╚═╝   ╚══════╝
 '@
+        }
+
+        $bannerLines = @($banner -split "`r?`n") | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        $bannerText = ($bannerLines | ForEach-Object { " $_" }) -join [Environment]::NewLine
+
+        Log-NewLine
 
         if ($Host.UI.SupportsVirtualTerminal) {
-            Write-Host "`e[38;5;39m$banner`e[0m"
+            Write-Host "`e[38;5;39m$bannerText`e[0m"
+            Log-NewLine
             return
         }
 
-        Write-Host $banner -ForegroundColor Cyan
+        Write-Host $bannerText -ForegroundColor Cyan
+        Log-NewLine
     }
 
     if ($NoPrompt) {
@@ -594,23 +712,13 @@ function Prompt-InstallerAction {
 
     Show-InstallerBanner
 
-    if (Test-GumAvailable) {
-        try {
-            $choice = & gum choose --header "windots action" "INSTALL" "UPDATE" "RESTORE" "QUIT"
-            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($choice)) {
-                return $choice.ToLowerInvariant()
-            }
-        }
-        catch {}
-    }
-
     Log-NewLine
-    Log-Info "1) INSTALL"
-    Log-Info "2) UPDATE"
-    Log-Info "3) RESTORE"
-    Log-Info "4) QUIT"
+    Log-Option "1) INSTALL"
+    Log-Option "2) UPDATE"
+    Log-Option "3) RESTORE"
+    Log-Option "4) QUIT"
 
-    $selection = Read-Host "Choose action (1-4)"
+    $selection = Read-WindotsInput -Prompt "Choose action (1-4)"
     switch ($selection) {
         "1" { return "install" }
         "2" { return "update" }
@@ -693,8 +801,8 @@ function Invoke-WindotsWrapperCommand {
 
     Log-Step "Running windots $CommandName"
     & $windotsPath @windotsArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "windots $CommandName failed with exit code $LASTEXITCODE"
+    if (-not $?) {
+        throw "windots $CommandName failed"
     }
 }
 
@@ -714,17 +822,20 @@ if (-not $LogPath) {
     $LogPath = Join-Path $env:TEMP ("windots-install-{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 }
 
+if (Get-Command Set-WindotsLogFilePath -ErrorAction SilentlyContinue) {
+    Set-WindotsLogFilePath -Path $LogPath -Reset
+}
+
 $resolvedAction = Resolve-InstallerAction
 if ($resolvedAction -eq "menu") {
     $resolvedAction = Prompt-InstallerAction
 }
 
-try {
-    Start-Transcript -Path $LogPath -Force | Out-Null
-    $startedTranscript = $true
+$autoApplyEnabled = if ($script:InstallerBoundParameters.ContainsKey("AutoApply")) {
+    [bool]$AutoApply
 }
-catch {
-    Log-Warn "Could not start transcript log: $($_.Exception.Message)"
+else {
+    $true
 }
 
 try {
@@ -768,6 +879,13 @@ try {
     Invoke-Step -Name "Resolving chezmoi executable" -Action {
         $script:chezmoiExe = Resolve-Chezmoi
         if (-not $script:chezmoiExe) {
+            $reloaded = Request-ShellReloadAndContinue -CommandName "chezmoi" -Reason "chezmoi was installed but is not available in PATH yet."
+            if ($reloaded) {
+                $script:chezmoiExe = Resolve-Chezmoi
+            }
+        }
+
+        if (-not $script:chezmoiExe) {
             throw @"
 chezmoi not found after install.
 Try:
@@ -788,29 +906,37 @@ Log: $LogPath
             $resolvedLocalRepo = (Resolve-Path $LocalRepoPath).Path
             Log-Info "using local repository source: $resolvedLocalRepo"
 
-            $initOutput = & $script:chezmoiExe init --source $resolvedLocalRepo 2>&1
-            if ($LASTEXITCODE -eq 0) {
+            $localInit = Invoke-NativeCommandSafely -CommandPath $script:chezmoiExe -Arguments @("init", "--source", $resolvedLocalRepo)
+            if ($localInit.ExitCode -eq 0) {
                 return
             }
 
             Log-Warn "chezmoi init output:"
-            $initOutput | ForEach-Object { Log-Warn "$_" }
-            throw "chezmoi init --source failed with exit code $LASTEXITCODE"
+            $localInit.Output | ForEach-Object {
+                if (-not [string]::IsNullOrWhiteSpace($_)) {
+                    Log-Output "$_"
+                }
+            }
+            throw "chezmoi init --source failed with exit code $($localInit.ExitCode)"
         }
 
         $repoUrl = "https://github.com/$Repo.git"
         Log-Info "using remote repository: $repoUrl (branch: $Branch)"
-        $initOutput = & $script:chezmoiExe init --branch $Branch $repoUrl 2>&1
-        if ($LASTEXITCODE -eq 0) {
+        $remoteInit = Invoke-NativeCommandSafely -CommandPath $script:chezmoiExe -Arguments @("init", "--branch", $Branch, $repoUrl)
+        if ($remoteInit.ExitCode -eq 0) {
             return
         }
 
         Log-Warn "chezmoi init output:"
-        $initOutput | ForEach-Object { Log-Warn "$_" }
+        $remoteInit.Output | ForEach-Object {
+            if (-not [string]::IsNullOrWhiteSpace($_)) {
+                Log-Output "$_"
+            }
+        }
 
         $sourcePath = Resolve-ExistingSource -Chez $script:chezmoiExe -RepoName $Repo
         if (-not $sourcePath) {
-            throw "chezmoi init failed with exit code $LASTEXITCODE"
+            throw "chezmoi init failed with exit code $($remoteInit.ExitCode)"
         }
     }
 
@@ -865,7 +991,7 @@ Log: $LogPath
     }
     if (-not $validatePath) { throw "Validate script not found under source path: $sourcePath" }
 
-    if ($AutoApply) {
+    if ($autoApplyEnabled) {
         $selectedModules = Resolve-ModuleSelection -RegistryPath $moduleRegistryPath -ModeName $Mode -Preselected $Modules
 
         Invoke-Step -Name "Running bootstrap ($Mode)" -Action {
@@ -896,15 +1022,15 @@ Log: $LogPath
     else {
         Log-NewLine
         Log-Info "Repository initialized only (manual apply mode)."
-        Log-Warn "Next commands:"
-        Log-Warn "1) Set-Location '$(Join-Path $HOME ".local\share\chezmoi")'"
-        Log-Warn "2) chezmoi apply"
-        Log-Warn "3) pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/windots.ps1 -Command bootstrap -Mode $Mode"
-        Log-Warn "4) pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/windots.ps1 -Command validate"
+        Log-Option "Next commands:"
+        Log-Option "1) Set-Location '$(Join-Path $HOME ".local\share\chezmoi")'"
+        Log-Option "2) chezmoi apply"
+        Log-Option "3) pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/windots.ps1 -Command bootstrap -Mode $Mode"
+        Log-Option "4) pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/windots.ps1 -Command validate"
         if (-not $SkipSecretsChecks) {
-            Log-Warn "5) pwsh -NoProfile -ExecutionPolicy Bypass -File ./modules/secrets/migrate.ps1"
+            Log-Option "5) pwsh -NoProfile -ExecutionPolicy Bypass -File ./modules/secrets/migrate.ps1"
             if (Test-Path $secretsDepsPath) {
-                Log-Warn "6) pwsh -NoProfile -ExecutionPolicy Bypass -File ./modules/secrets/deps-check.ps1"
+                Log-Option "6) pwsh -NoProfile -ExecutionPolicy Bypass -File ./modules/secrets/deps-check.ps1"
             }
         }
         Log-Info "Install log: $LogPath"
@@ -916,16 +1042,11 @@ catch {
     Log-Error "Error: $($_.Exception.Message)"
     Log-Warn "Log: $LogPath"
     Log-NewLine
-    Log-Warn "Recovery options:"
-    Log-Warn "1) Re-run same command (installer is idempotent)."
-    Log-Warn "2) Re-run skipping base install:"
-    Log-Warn "   & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1'))) -SkipBaseInstall"
-    Log-Warn "3) Reopen terminal and run option 2 (refreshes PATH in new session)."
-    Log-Warn "4) Verify chezmoi manually: winget list --id twpayne.chezmoi"
+    Log-Option "Recovery options:"
+    Log-Option "1) Re-run same command (installer is idempotent)."
+    Log-Option "2) Re-run skipping base install:"
+    Log-Option "& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1'))) -SkipBaseInstall"
+    Log-Option "3) Reopen terminal and run option 2 (refreshes PATH in new session)."
+    Log-Option "4) Verify chezmoi manually: winget list --id twpayne.chezmoi"
     throw
-}
-finally {
-    if ($startedTranscript) {
-        try { Stop-Transcript | Out-Null } catch {}
-    }
 }

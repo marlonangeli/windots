@@ -19,7 +19,6 @@ Describe "Windots module registry" {
         $plan = Resolve-WindotsModuleExecutionPlan -Mode full -RequestedModules @("mise") -ScriptsRoot $repoRoot
         $names = $plan | Select-Object -ExpandProperty Name
         $names | Should -Contain "core"
-        $names | Should -Contain "packages"
         $names | Should -Contain "mise"
     }
 

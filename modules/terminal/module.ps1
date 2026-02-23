@@ -19,7 +19,7 @@ function Invoke-WindotsModuleTerminal {
     }
 
     $templatePath = Join-Path $repoRoot "home\dot_config\windows-terminal\settings.json.tmpl"
-    $hookPath = Join-Path $repoRoot "home\.chezmoiscripts\run_after_40-sync-windows-terminal.ps1.tmpl"
+    $hookPath = Join-Path $repoRoot ".chezmoiscripts\run_after_40-sync-windows-terminal.ps1.tmpl"
 
     if (-not (Test-Path $templatePath)) {
         throw "[terminal] Missing template: $templatePath"

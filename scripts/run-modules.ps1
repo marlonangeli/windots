@@ -90,15 +90,48 @@ $context = @{
     RepoRoot = $repoRoot
 }
 
-$sequence = $plan | Select-Object -ExpandProperty Name
-Log-Info ("Module execution order: " + ($sequence -join " -> "))
+function Convert-ToModuleTitle {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Name)
+
+    if ([string]::IsNullOrWhiteSpace($Name)) {
+        return "Unknown"
+    }
+
+    $normalized = $Name.ToLowerInvariant()
+    return ($normalized.Substring(0, 1).ToUpperInvariant() + $normalized.Substring(1))
+}
+
+function Show-ModuleSection {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][pscustomobject]$Module
+    )
+
+    Log-Module "=============="
+
+    $title = if ($Module.PSObject.Properties.Name -contains "DisplayName" -and -not [string]::IsNullOrWhiteSpace($Module.DisplayName)) {
+        $Module.DisplayName
+    }
+    else {
+        Convert-ToModuleTitle -Name $Module.Name
+    }
+
+    Log-Module ("Module: {0}" -f $title)
+
+    if ($Module.PSObject.Properties.Name -contains "Description" -and -not [string]::IsNullOrWhiteSpace($Module.Description)) {
+        Log-ModuleDescription $Module.Description
+    }
+
+    Log-Module "=============="
+}
 
 foreach ($module in $plan) {
     if (-not (Get-Command $module.EntryFunction -ErrorAction SilentlyContinue)) {
         throw "Module entrypoint not found: $($module.EntryFunction)"
     }
 
-    Log-Step ("Running module: {0}" -f $module.Name)
+    Show-ModuleSection -Module $module
     try {
         & $module.EntryFunction -Context $context
     }

@@ -104,8 +104,8 @@ function Invoke-BootstrapWorkflow {
     }
 
     & $bootstrapPath @bootstrapArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "bootstrap failed with exit code $LASTEXITCODE"
+    if (-not $?) {
+        throw "bootstrap failed"
     }
 }
 
@@ -116,8 +116,8 @@ function Invoke-Validation {
     }
 
     & $validatePath
-    if ($LASTEXITCODE -ne 0) {
-        throw "validate.ps1 failed with exit code $LASTEXITCODE"
+    if (-not $?) {
+        throw "validate.ps1 failed"
     }
 }
 
@@ -291,8 +291,8 @@ function Invoke-RestoreWorkflow {
 
     Log-Step "Running restore installer workflow"
     & $installPath @installArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "install.ps1 restore workflow failed with exit code $LASTEXITCODE"
+    if (-not $?) {
+        throw "install.ps1 restore workflow failed"
     }
 }
 

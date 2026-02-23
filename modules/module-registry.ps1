@@ -10,6 +10,8 @@ function Get-WindotsModuleRegistry {
     return @(
         [pscustomobject]@{
             Name = "core"
+            DisplayName = "Core"
+            Description = "Installs required base tooling and applies chezmoi state."
             DependsOn = @()
             Category = "action"
             RequiresElevation = $false
@@ -20,6 +22,8 @@ function Get-WindotsModuleRegistry {
         },
         [pscustomobject]@{
             Name = "packages"
+            DisplayName = "Packages"
+            Description = "Installs optional package bundle for developer workflows."
             DependsOn = @("core")
             Category = "action"
             RequiresElevation = $false
@@ -30,6 +34,8 @@ function Get-WindotsModuleRegistry {
         },
         [pscustomobject]@{
             Name = "shell"
+            DisplayName = "Shell"
+            Description = "Configures PowerShell profile, helpers, and shell experience."
             DependsOn = @("core")
             Category = "action"
             RequiresElevation = $false
@@ -40,7 +46,9 @@ function Get-WindotsModuleRegistry {
         },
         [pscustomobject]@{
             Name = "development"
-            DependsOn = @("core", "packages")
+            DisplayName = "Development"
+            Description = "Installs optional dev runtimes and CLI tooling."
+            DependsOn = @("core", "packages", "mise")
             Category = "action"
             RequiresElevation = $false
             Optional = $true
@@ -50,6 +58,8 @@ function Get-WindotsModuleRegistry {
         },
         [pscustomobject]@{
             Name = "themes"
+            DisplayName = "Themes"
+            Description = "Sets fonts and prompt theme defaults across terminal tools."
             DependsOn = @("shell")
             Category = "action"
             RequiresElevation = $false
@@ -60,6 +70,8 @@ function Get-WindotsModuleRegistry {
         },
         [pscustomobject]@{
             Name = "terminal"
+            DisplayName = "Terminal"
+            Description = "Ensures Windows Terminal templates and sync hooks are ready."
             DependsOn = @("core")
             Category = "config"
             RequiresElevation = $false
@@ -70,6 +82,8 @@ function Get-WindotsModuleRegistry {
         },
         [pscustomobject]@{
             Name = "ai"
+            DisplayName = "AI"
+            Description = "Installs AI tooling and syncs MCP and skills configs."
             DependsOn = @("core")
             Category = "action"
             RequiresElevation = $false
@@ -80,7 +94,9 @@ function Get-WindotsModuleRegistry {
         },
         [pscustomobject]@{
             Name = "mise"
-            DependsOn = @("core", "packages")
+            DisplayName = "Mise"
+            Description = "Configures mise, trusts config, and installs toolchain versions."
+            DependsOn = @("core")
             Category = "action"
             RequiresElevation = $false
             Optional = $true
@@ -90,6 +106,8 @@ function Get-WindotsModuleRegistry {
         },
         [pscustomobject]@{
             Name = "secrets"
+            DisplayName = "Secrets"
+            Description = "Validates secret tooling and checks external secret dependencies."
             DependsOn = @("core")
             Category = "action"
             RequiresElevation = $false
@@ -100,6 +118,8 @@ function Get-WindotsModuleRegistry {
         },
         [pscustomobject]@{
             Name = "validate"
+            DisplayName = "Validate"
+            Description = "Runs repository validation checks and policy guardrails."
             DependsOn = @("core")
             Category = "action"
             RequiresElevation = $false
@@ -120,10 +140,10 @@ function Get-WindotsDefaultModules {
 
     switch ($Mode) {
         "full" {
-            return @("core", "packages", "shell", "development", "themes", "terminal", "ai", "mise")
+            return @("core", "shell", "mise", "packages", "development", "themes", "terminal", "ai")
         }
         "clean" {
-            return @("core", "packages", "shell", "themes", "terminal")
+            return @("core", "shell", "packages", "themes", "terminal")
         }
         default {
             throw "Unsupported mode: $Mode"
