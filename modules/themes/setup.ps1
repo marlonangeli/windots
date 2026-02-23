@@ -12,7 +12,10 @@ $scriptsRoot = Join-Path $repoRoot "scripts"
 . (Join-Path $scriptsRoot "common\winget.ps1")
 
 function Test-FontInstalled {
-    param([Parameter(Mandatory)][string]$Pattern)
+    param(
+        [Parameter(Mandatory)][string[]]$RegistryPatterns,
+        [Parameter(Mandatory)][string[]]$FilePatterns
+    )
 
     $registryPaths = @(
         "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts",
@@ -23,7 +26,26 @@ function Test-FontInstalled {
         if (-not (Test-Path $path)) { continue }
         $props = Get-ItemProperty -Path $path
         foreach ($property in $props.PSObject.Properties) {
-            if ($property.Name -match $Pattern) {
+            foreach ($pattern in $RegistryPatterns) {
+                if ($property.Name -match $pattern) {
+                    return $true
+                }
+            }
+        }
+    }
+
+    $fontDirs = @(
+        (Join-Path $env:WINDIR "Fonts"),
+        (Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts")
+    )
+
+    foreach ($fontDir in $fontDirs) {
+        if (-not (Test-Path $fontDir)) { continue }
+
+        foreach ($filePattern in $FilePatterns) {
+            $match = Get-ChildItem -Path $fontDir -Filter $filePattern -File -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+            if ($match) {
                 return $true
             }
         }
@@ -54,7 +76,9 @@ if (-not (Test-Path $themePath)) {
     Invoke-WebRequest -Uri $themeUrl -OutFile $themePath -ErrorAction Stop
 }
 
-$fontInstalled = Test-FontInstalled -Pattern "JetBrainsMono.*Nerd Font"
+$fontInstalled = Test-FontInstalled `
+    -RegistryPatterns @("JetBrainsMono.*Nerd Font", "JetBrainsMono.*\bNF(M|P)?\b") `
+    -FilePatterns @("JetBrainsMonoNerdFont-*.ttf", "JetBrainsMono*Nerd*Font*.ttf", "JetBrainsMono*NF*.ttf")
 if (-not $fontInstalled) {
     Log-Warn "Nerd Font not detected. Installing '$FontName'."
     try {

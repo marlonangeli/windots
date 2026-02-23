@@ -7,6 +7,40 @@ $scriptsRoot = Join-Path $repoRoot "scripts"
 . (Join-Path $scriptsRoot "common\logging.ps1")
 . (Join-Path $repoRoot "modules\packages\manager.ps1")
 
+function Invoke-WindotsOptionalJiraCliInstall {
+    [CmdletBinding()]
+    param(
+        [hashtable]$Context = @{},
+        [switch]$InstallJiraCli
+    )
+
+    if (-not $InstallJiraCli) {
+        Log-PackageStatus -Package "jira-cli" -Status "skipped by choice" -StatusColor Cyan
+        return
+    }
+
+    $installerPath = Join-Path $PSScriptRoot "install-jira-cli.ps1"
+    if (-not (Test-Path $installerPath)) {
+        Log-Warn "[secrets] jira-cli installer script missing: $installerPath"
+        return
+    }
+
+    if ($Context.WhatIf) {
+        Log-Output "WhatIf: would install jira-cli from ankitpokhrel/jira-cli releases."
+        return
+    }
+
+    try {
+        & $installerPath
+        if (-not $?) {
+            throw "jira-cli installer failed"
+        }
+    }
+    catch {
+        Log-Warn "[secrets] jira-cli install failed (optional): $($_.Exception.Message)"
+    }
+}
+
 function Invoke-WindotsModuleSecrets {
     [CmdletBinding()]
     param(
@@ -18,9 +52,13 @@ function Invoke-WindotsModuleSecrets {
         return
     }
 
+    $installJiraCli = $false
     if (-not $Context.SkipInstall) {
+        $installJiraCli = Confirm-WindotsChoice -Message "Install Jira CLI from ankitpokhrel/jira-cli releases?" -NoPrompt:$Context.NoPrompt
+
         $mode = if ($Context.Mode) { $Context.Mode } else { "full" }
         Ensure-WindotsModulePackages -Module "secrets" -Mode $mode -WhatIf:$Context.WhatIf
+        Invoke-WindotsOptionalJiraCliInstall -Context $Context -InstallJiraCli:$installJiraCli
     }
 
     $migratePath = Join-Path $PSScriptRoot "migrate.ps1"
@@ -34,16 +72,16 @@ function Invoke-WindotsModuleSecrets {
     if (Test-Path $migratePath) {
         Log-Step "[secrets] Running migration checks"
         & $migratePath
-        if ($LASTEXITCODE -ne 0) {
-            throw "[secrets] migration checks failed with exit code $LASTEXITCODE"
+        if (-not $?) {
+            throw "[secrets] migration checks failed"
         }
     }
 
     if (Test-Path $depsPath) {
         Log-Step "[secrets] Running dependency checks"
         & $depsPath
-        if ($LASTEXITCODE -ne 0) {
-            throw "[secrets] dependency checks failed with exit code $LASTEXITCODE"
+        if (-not $?) {
+            throw "[secrets] dependency checks failed"
         }
     }
 }

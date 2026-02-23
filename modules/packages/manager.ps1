@@ -220,42 +220,39 @@ function Ensure-WindotsModulePackages {
 
         if ($useSelectionFilter -and -not $pkgHt.Required) {
             if ($pkgHt.Name.ToLowerInvariant() -notin $normalizedSelected) {
-                Log-Package "package $packageLabel"
-                Log-Info "skipped by selection."
+                Log-PackageStatus -Package $packageLabel -Status "skipped by selection" -StatusColor Yellow -FileLevel "WARN"
                 continue
             }
         }
-
-        Log-Package "package $packageLabel"
 
         if ($pkgHt.Provider -eq 'mise' -and -not (Get-Command mise -ErrorAction SilentlyContinue)) {
             if ($pkgHt.Required) {
                 throw "required package '$packageLabel' needs mise, but mise is not available in PATH"
             }
 
-            Log-Info "skipped: provider 'mise' is not available yet."
+            Log-PackageStatus -Package $packageLabel -Status "skipped: provider 'mise' is not available yet" -StatusColor Yellow -FileLevel "WARN"
             continue
         }
 
         $installed = Test-WindotsPackageInstalled -Package $pkgHt
         if ($installed) {
-            Log-Success "is installed."
+            Log-PackageStatus -Package $packageLabel -Status "is installed" -StatusColor Green
             continue
         }
 
-        Log-Info "is not installed."
+        Log-PackageStatus -Package $packageLabel -Status "is not installed" -StatusColor Cyan
 
         if ($WhatIf) {
             Log-Output ("WhatIf: would install via provider '{0}'." -f $pkgHt.Provider)
             continue
         }
 
-        Log-Info "installing..."
+        Log-Step ("installing package {0}" -f $packageLabel)
 
         if (-not $pkgHt.Required) {
             try {
                 Install-WindotsPackage -Package $pkgHt
-                Log-Success "installed successfully."
+                Log-PackageStatus -Package $packageLabel -Status "installed successfully" -StatusColor Green
             }
             catch {
                 Log-Warn ("failed to install (optional): {0}" -f $_.Exception.Message)
@@ -265,7 +262,7 @@ function Ensure-WindotsModulePackages {
 
         try {
             Install-WindotsPackage -Package $pkgHt
-            Log-Success "installed successfully."
+            Log-PackageStatus -Package $packageLabel -Status "installed successfully" -StatusColor Green
         }
         catch {
             Log-Error ("failed to install: {0}" -f $_.Exception.Message)

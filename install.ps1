@@ -94,9 +94,23 @@ else {
     function Log-Success { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Green -Level "INFO" }
     function Log-Option { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Magenta -Level "INFO" -Indent 4 }
     function Log-Output { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Gray -Level "INFO" -Indent 4 }
-    function Log-Module { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Blue -Level "INFO" -Indent 2 }
+    function Log-Module { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Cyan -Level "INFO" }
     function Log-ModuleDescription { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Gray -Level "INFO" -Indent 4 }
-    function Log-Package { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color DarkCyan -Level "INFO" -Indent 4 }
+    function Log-Package { param([Parameter(Mandatory)][string]$Message) Write-WindotsFallbackLine -Message $Message -Color Cyan -Level "INFO" -Indent 4 }
+    function Log-PackageStatus {
+        param(
+            [Parameter(Mandatory)][string]$Package,
+            [Parameter(Mandatory)][string]$Status,
+            [ConsoleColor]$StatusColor = [ConsoleColor]::Green,
+            [ValidateSet("INFO", "WARN", "ERROR")]
+            [string]$FileLevel = "INFO"
+        )
+
+        $message = "package {0} {1}" -f $Package, $Status
+        Write-WindotsLogFileLine -Level $FileLevel -Message $message
+        Write-Host ("    package {0} " -f $Package) -ForegroundColor Cyan -NoNewline
+        Write-Host $Status -ForegroundColor $StatusColor
+    }
     function Read-WindotsInput {
         param([Parameter(Mandatory)][string]$Prompt)
         Write-WindotsLogFileLine -Level "INFO" -Message ("Input prompt: {0}" -f $Prompt)
@@ -224,14 +238,14 @@ function Ensure-WingetPackage {
         $installed = ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($probe | Out-String)))
     }
 
-    Log-Package "package $Id"
+    $packageLabel = $Id
     if ($installed) {
-        Log-Success "is installed."
+        Log-PackageStatus -Package $packageLabel -Status "is installed" -StatusColor Green
         return
     }
 
-    Log-Info "is not installed."
-    Log-Info "installing..."
+    Log-PackageStatus -Package $packageLabel -Status "is not installed" -StatusColor Cyan
+    Log-Step ("installing package {0}" -f $packageLabel)
 
     try {
         if ($hasWingetWrapper) {
@@ -254,11 +268,11 @@ function Ensure-WingetPackage {
         }
     }
     catch {
-        Log-Error "failed to install."
+        Log-Error ("failed to install package '{0}'." -f $packageLabel)
         throw
     }
 
-    Log-Success "installed successfully."
+    Log-PackageStatus -Package $packageLabel -Status "installed successfully" -StatusColor Green
 }
 
 function Refresh-ProcessPath {

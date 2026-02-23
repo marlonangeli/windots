@@ -93,7 +93,7 @@ function Invoke-WindotsModuleShell {
         & $scriptPath -Action install
     }
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "[shell] profile shim install failed with exit code $LASTEXITCODE"
+    if (-not $?) {
+        throw "[shell] profile shim install failed."
     }
 }

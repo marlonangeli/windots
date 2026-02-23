@@ -108,6 +108,7 @@ What is validated:
 - Secrets helpers
   - `pwsh ./modules/secrets/migrate.ps1`
   - `pwsh ./modules/secrets/deps-check.ps1`
+  - `pwsh ./modules/secrets/install-jira-cli.ps1` (optional, installs from GitHub release)
 
 ## Winget Behavior
 

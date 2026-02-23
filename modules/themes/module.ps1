@@ -30,7 +30,7 @@ function Invoke-WindotsModuleThemes {
 
     Log-Step "[themes] Configuring oh-my-posh"
     & $scriptPath
-    if ($LASTEXITCODE -ne 0) {
-        throw "[themes] setup failed with exit code $LASTEXITCODE"
+    if (-not $?) {
+        throw "[themes] setup failed."
     }
 }

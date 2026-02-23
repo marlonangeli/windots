@@ -108,7 +108,8 @@ function Show-ModuleSection {
         [Parameter(Mandatory)][pscustomobject]$Module
     )
 
-    Log-Module "=============="
+    $separator = "=" * 80
+    Log-Module $separator
 
     $title = if ($Module.PSObject.Properties.Name -contains "DisplayName" -and -not [string]::IsNullOrWhiteSpace($Module.DisplayName)) {
         $Module.DisplayName
@@ -123,7 +124,7 @@ function Show-ModuleSection {
         Log-ModuleDescription $Module.Description
     }
 
-    Log-Module "=============="
+    Log-Module $separator
 }
 
 foreach ($module in $plan) {

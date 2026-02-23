@@ -37,6 +37,7 @@ Optional tools:
 - [`fzf`](https://github.com/junegunn/fzf) (used by `zi`/zoxide interactive jump)
 - [`usage`](https://github.com/jdx/usage) (installed via `mise` as `cargo:usage-cli`)
 - Visual Studio Build Tools 2022 with C++ workload (needed for cargo-built CLI tools on Windows)
+- [`jira-cli`](https://github.com/ankitpokhrel/jira-cli) (optional, prompted in `secrets` module, installed from GitHub releases)
 
 ## Installation
 

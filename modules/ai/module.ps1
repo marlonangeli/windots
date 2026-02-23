@@ -36,7 +36,7 @@ function Invoke-WindotsModuleAI {
         & $scriptPath
     }
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "[ai] config sync failed with exit code $LASTEXITCODE"
+    if (-not $?) {
+        throw "[ai] config sync failed."
     }
 }

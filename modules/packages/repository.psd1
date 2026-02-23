@@ -138,15 +138,6 @@
             Required = $false
         },
         @{
-            Name = 'jira-cli'
-            Provider = 'winget'
-            PackageId = 'go-jira.jira'
-            VerifyCommand = 'jira'
-            Modules = @('secrets')
-            Modes = @('full', 'clean')
-            Required = $false
-        },
-        @{
             Name = 'fzf'
             Provider = 'winget'
             PackageId = 'junegunn.fzf'

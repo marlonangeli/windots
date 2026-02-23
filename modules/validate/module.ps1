@@ -24,7 +24,7 @@ function Invoke-WindotsModuleValidate {
 
     Log-Step "[validate] Running repository validation"
     & $scriptPath
-    if ($LASTEXITCODE -ne 0) {
-        throw "[validate] validate.ps1 failed with exit code $LASTEXITCODE"
+    if (-not $?) {
+        throw "[validate] validate.ps1 failed."
     }
 }

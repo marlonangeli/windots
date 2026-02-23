@@ -128,7 +128,7 @@ function Log-Module {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Message)
 
-    Write-WindotsLog -Message $Message -FileLevel "INFO" -ConsoleColor Blue -Indent 2
+    Write-WindotsLog -Message $Message -FileLevel "INFO" -ConsoleColor Cyan
 }
 
 function Log-ModuleDescription {
@@ -142,7 +142,23 @@ function Log-Package {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Message)
 
-    Write-WindotsLog -Message $Message -FileLevel "INFO" -ConsoleColor DarkCyan -Indent 4
+    Write-WindotsLog -Message $Message -FileLevel "INFO" -ConsoleColor Cyan -Indent 4
+}
+
+function Log-PackageStatus {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Package,
+        [Parameter(Mandatory)][string]$Status,
+        [ConsoleColor]$StatusColor = [ConsoleColor]::Green,
+        [ValidateSet("INFO", "WARN", "ERROR")]
+        [string]$FileLevel = "INFO"
+    )
+
+    $message = "package {0} {1}" -f $Package, $Status
+    Write-WindotsLogFileLine -Level $FileLevel -Message $message
+    Write-WindotsConsoleLine -Message ("package {0} " -f $Package) -Color Cyan -Indent 4 -NoNewLine
+    Write-WindotsConsoleLine -Message $Status -Color $StatusColor
 }
 
 function Read-WindotsInput {

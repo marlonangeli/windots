@@ -49,6 +49,7 @@ $requiredFiles = @(
     "modules/secrets/module.ps1",
     "modules/secrets/migrate.ps1",
     "modules/secrets/deps-check.ps1",
+    "modules/secrets/install-jira-cli.ps1",
     "modules/validate/module.ps1",
     "tests/run.ps1",
     "tests/smoke.ps1",
