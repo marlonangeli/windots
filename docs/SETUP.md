@@ -115,6 +115,7 @@ Managed `winget` operations are routed through `scripts/common/winget.ps1`.
 
 - source forced to `winget`
 - agreement flags appended by default
+- package-specific install overrides are supported (for example VS Build Tools workloads)
 - fallback path for msstore certificate/source failures
 - operation logging and explicit exit-code handling
 

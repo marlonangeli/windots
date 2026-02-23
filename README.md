@@ -34,6 +34,9 @@ Optional tools:
 - [`mise`](https://mise.jdx.dev)
 - [`gum`](https://github.com/charmbracelet/gum)
 - [`bw`](https://bitwarden.com/help/cli/)
+- [`fzf`](https://github.com/junegunn/fzf) (used by `zi`/zoxide interactive jump)
+- [`usage`](https://github.com/jdx/usage) (installed via `mise` as `cargo:usage-cli`)
+- Visual Studio Build Tools 2022 with C++ workload (needed for cargo-built CLI tools on Windows)
 
 ## Installation
 

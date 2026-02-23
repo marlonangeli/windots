@@ -15,8 +15,13 @@ function Install-WindotsWingetPackage {
     [CmdletBinding()]
     param([Parameter(Mandatory)][hashtable]$Package)
 
+    $extraArgs = @()
+    if ($Package.ContainsKey("ExtraArgs") -and $Package.ExtraArgs) {
+        $extraArgs = @($Package.ExtraArgs | ForEach-Object { $_.ToString() })
+    }
+
     try {
-        Invoke-WingetInstall -Id $Package.PackageId
+        Invoke-WingetInstall -Id $Package.PackageId -ExtraArgs $extraArgs
     }
     catch {
         throw "winget package installation failed for '$($Package.PackageId)': $($_.Exception.Message)"

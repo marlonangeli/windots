@@ -147,6 +147,28 @@
             Required = $false
         },
         @{
+            Name = 'fzf'
+            Provider = 'winget'
+            PackageId = 'junegunn.fzf'
+            VerifyCommand = 'fzf'
+            Modules = @('packages')
+            Modes = @('full', 'clean')
+            Required = $false
+        },
+        @{
+            Name = 'visual-studio-build-tools'
+            Provider = 'winget'
+            PackageId = 'Microsoft.VisualStudio.2022.BuildTools'
+            VerifyPath = '${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\2022\\BuildTools'
+            ExtraArgs = @(
+                '--override'
+                '--quiet --wait --norestart --nocache --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --includeRecommended --includeOptional'
+            )
+            Modules = @('development')
+            Modes = @('full')
+            Required = $false
+        },
+        @{
             Name = 'mise-tool-dotnet'
             Provider = 'mise'
             PackageId = 'dotnet'
@@ -216,6 +238,15 @@
             VerifyCommand = 'zoxide'
             Modules = @('packages')
             Modes = @('full', 'clean')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-usage'
+            Provider = 'mise'
+            PackageId = 'cargo:usage-cli'
+            VerifyCommand = 'usage'
+            Modules = @('development')
+            Modes = @('full')
             Required = $false
         }
     )

@@ -5,7 +5,15 @@
 # - clean: core aliases/utilities only
 # ============================================
 
-$ProfileDir = Split-Path -Parent $PROFILE
+$ProfileRoot = if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+    Split-Path -Parent $PROFILE
+}
+else {
+    $PSScriptRoot
+}
+
+$ProfileModulesDir = Join-Path $ProfileRoot "modules"
+$global:__PSProfileRoot = $ProfileRoot
 $mode = $env:POWERSHELL_PROFILE_MODE
 if ([string]::IsNullOrWhiteSpace($mode)) { $mode = "full" }
 $mode = $mode.Trim().ToLowerInvariant()
@@ -75,16 +83,16 @@ function Import-ProfileModule {
     }
 }
 
-$configPath = "$ProfileDir\modules\config.ps1"
-$aliasesPath = "$ProfileDir\modules\aliases.ps1"
-$utilsPath = "$ProfileDir\modules\utils.ps1"
+$configPath = Join-Path $ProfileModulesDir "config.ps1"
+$aliasesPath = Join-Path $ProfileModulesDir "aliases.ps1"
+$utilsPath = Join-Path $ProfileModulesDir "utils.ps1"
 
 if (Import-ProfileScript $configPath) { . $configPath }
 if (Import-ProfileScript $aliasesPath) { . $aliasesPath }
 if (Import-ProfileScript $utilsPath) { . $utilsPath }
 
 if ($mode -eq "full") {
-    Import-ProfileModule "$ProfileDir\modules\worktrees.psm1" | Out-Null
-    Import-ProfileModule "$ProfileDir\modules\time-tracker.psm1" | Out-Null
-    Import-ProfileModule "$ProfileDir\modules\pr-workflow.psm1" | Out-Null
+    Import-ProfileModule (Join-Path $ProfileModulesDir "worktrees.psm1") | Out-Null
+    Import-ProfileModule (Join-Path $ProfileModulesDir "time-tracker.psm1") | Out-Null
+    Import-ProfileModule (Join-Path $ProfileModulesDir "pr-workflow.psm1") | Out-Null
 }
