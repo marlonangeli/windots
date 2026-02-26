@@ -74,6 +74,24 @@ function Get-WindotsExecutionPolicyState {
     return [pscustomobject]$state
 }
 
+function Get-WindotsPowerShellRuntime {
+    [CmdletBinding()]
+    param()
+
+    $version = if ($PSVersionTable -and $PSVersionTable.PSVersion) {
+        $PSVersionTable.PSVersion
+    }
+    else {
+        [version]"0.0"
+    }
+
+    return [pscustomobject]@{
+        Edition = if ($PSVersionTable) { $PSVersionTable.PSEdition } else { "Unknown" }
+        Version = $version
+        IsPowerShell7OrGreater = ($version.Major -ge 7)
+    }
+}
+
 function Test-WindotsChezmoiInitialized {
     [CmdletBinding()]
     param(
@@ -158,6 +176,17 @@ function Invoke-WindotsPreflight {
     $errors = New-Object System.Collections.Generic.List[string]
     $warnings = New-Object System.Collections.Generic.List[string]
 
+    $runtime = Get-WindotsPowerShellRuntime
+    Log-Info ("powershell runtime: {0} {1}" -f $runtime.Edition, $runtime.Version)
+    if (-not $runtime.IsPowerShell7OrGreater) {
+        if ($Action -eq "install") {
+            $warnings.Add("PowerShell 7+ is required. Install flow will relaunch in pwsh after base dependencies are ensured.")
+        }
+        else {
+            $errors.Add("Action '$Action' requires PowerShell 7+. Re-run this workflow with pwsh.")
+        }
+    }
+
     $wingetStatus = Test-WindotsWingetSource
     if (-not $wingetStatus.HasWinget) {
         $errors.Add("winget not found. Install App Installer before continuing.")
@@ -183,7 +212,7 @@ function Invoke-WindotsPreflight {
         Log-Info ("execution policy (Process/CurrentUser/LocalMachine): {0}/{1}/{2}" -f $policy.Process, $policy.CurrentUser, $policy.LocalMachine)
     }
 
-    foreach ($commandName in @("git", "chezmoi", "pwsh")) {
+    foreach ($commandName in @("git", "chezmoi", "pwsh", "gum")) {
         if (Get-Command $commandName -ErrorAction SilentlyContinue) {
             Log-Info "command detected: $commandName"
             continue

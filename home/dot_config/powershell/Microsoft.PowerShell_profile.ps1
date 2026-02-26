@@ -5,6 +5,10 @@
 # - clean: core aliases/utilities only
 # ============================================
 
+if (-not $PSVersionTable -or -not $PSVersionTable.PSVersion -or $PSVersionTable.PSVersion.Major -lt 7) {
+    return
+}
+
 $ProfileRoot = if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
     Split-Path -Parent $PROFILE
 }

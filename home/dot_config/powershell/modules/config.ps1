@@ -101,6 +101,26 @@ $global:__MiseActivationAttempted = $global:__MiseActivationAttempted -as [bool]
 $global:__MiseCompletionInitialized = $global:__MiseCompletionInitialized -as [bool]
 $global:__MiseCompletionAttempted = $global:__MiseCompletionAttempted -as [bool]
 
+function Invoke-MiseActivationScript {
+    [CmdletBinding()]
+    param()
+
+    $previousNotFoundAutoInstall = [Environment]::GetEnvironmentVariable("MISE_NOT_FOUND_AUTO_INSTALL", "Process")
+    [Environment]::SetEnvironmentVariable("MISE_NOT_FOUND_AUTO_INSTALL", "0", "Process")
+
+    try {
+        return (Invoke-ShellInitScript -Command "mise" -Arguments @("activate", "pwsh"))
+    }
+    finally {
+        if ([string]::IsNullOrWhiteSpace($previousNotFoundAutoInstall)) {
+            [Environment]::SetEnvironmentVariable("MISE_NOT_FOUND_AUTO_INSTALL", $null, "Process")
+        }
+        else {
+            [Environment]::SetEnvironmentVariable("MISE_NOT_FOUND_AUTO_INSTALL", $previousNotFoundAutoInstall, "Process")
+        }
+    }
+}
+
 function Enable-Mise {
     if ($global:__MiseInitialized) { return $true }
 
@@ -116,7 +136,7 @@ function Enable-Mise {
     }
 
     $global:__MiseActivationAttempted = $true
-    if (Invoke-ShellInitScript -Command "mise" -Arguments @("activate", "pwsh")) {
+    if (Invoke-MiseActivationScript) {
         $global:__MiseInitialized = $true
         return $true
     }

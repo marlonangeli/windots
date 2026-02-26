@@ -81,7 +81,7 @@
             VerifyCommand = 'gum'
             Modules = @('core')
             Modes = @('full', 'clean')
-            Required = $false
+            Required = $true
         },
         @{
             Name = 'azure-cli'

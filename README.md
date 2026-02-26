@@ -23,16 +23,15 @@ The repo is module-driven, idempotent, and designed for repeatable machine setup
 ## Requirements
 
 - Windows with `winget` available
-- PowerShell 7+
+- PowerShell 7+ (installer relaunches into `pwsh` automatically when started from Windows PowerShell 5.1)
 - Git
 - [`chezmoi`](https://www.chezmoi.io/)
 
 These are checked during installer preflight (`scripts/common/preflight.ps1`).
 
-Optional tools:
+Optional tools (core dependencies like `gum` are installed automatically):
 
 - [`mise`](https://mise.jdx.dev)
-- [`gum`](https://github.com/charmbracelet/gum)
 - [`bw`](https://bitwarden.com/help/cli/)
 - [`fzf`](https://github.com/junegunn/fzf) (used by `zi`/zoxide interactive jump)
 - [`usage`](https://github.com/jdx/usage) (installed via `mise` as `cargo:usage-cli`)

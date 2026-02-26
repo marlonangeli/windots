@@ -14,6 +14,8 @@ Local execution:
 pwsh -NoProfile -File ./install.ps1
 ```
 
+If you start from Windows PowerShell 5.1, the install flow ensures base dependencies (including PowerShell 7 and gum) and relaunches itself in `pwsh` automatically.
+
 Direct GitHub raw fallback:
 
 ```powershell

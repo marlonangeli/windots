@@ -28,6 +28,16 @@ $ErrorActionPreference = "Stop"
 $script:CurrentStep = "bootstrap"
 $script:chezmoiExe = $null
 $script:InstallerBoundParameters = @{}
+$script:InstallerScriptPath = $PSCommandPath
+$script:InstallerScriptText = $null
+
+if (-not [string]::IsNullOrWhiteSpace($script:InstallerScriptPath) -and (Test-Path $script:InstallerScriptPath)) {
+    $script:InstallerScriptPath = (Resolve-Path $script:InstallerScriptPath).Path
+}
+elseif ($MyInvocation -and $MyInvocation.MyCommand -and $MyInvocation.MyCommand.ScriptBlock) {
+    $script:InstallerScriptText = $MyInvocation.MyCommand.ScriptBlock.ToString()
+}
+
 foreach ($boundKey in $PSBoundParameters.Keys) {
     $script:InstallerBoundParameters[$boundKey] = $PSBoundParameters[$boundKey]
 }
@@ -281,6 +291,162 @@ function Refresh-ProcessPath {
     $combined = @($machine, $user) -join ";"
     if (-not [string]::IsNullOrWhiteSpace($combined)) {
         $env:Path = $combined
+    }
+}
+
+function Test-RunningOnPowerShell7OrGreater {
+    if (-not $PSVersionTable -or -not $PSVersionTable.PSVersion) {
+        return $false
+    }
+
+    return ($PSVersionTable.PSVersion.Major -ge 7)
+}
+
+function Resolve-PwshExecutable {
+    $cmd = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+
+    Refresh-ProcessPath
+    $cmd = Get-Command pwsh -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+
+    return $null
+}
+
+function Resolve-InstallerScriptPath {
+    $candidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($script:InstallerScriptPath)) {
+        $candidates += $script:InstallerScriptPath
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PSCommandPath)) {
+        $candidates += $PSCommandPath
+    }
+
+    foreach ($candidate in ($candidates | Select-Object -Unique)) {
+        if (Test-Path $candidate) {
+            return (Resolve-Path $candidate).Path
+        }
+    }
+
+    return $null
+}
+
+function Get-InstallerRelaunchParameters {
+    [CmdletBinding()]
+    param(
+        [string]$ResolvedAction,
+        [switch]$ForceSkipBaseInstall
+    )
+
+    $payload = [ordered]@{}
+
+    foreach ($key in $script:InstallerBoundParameters.Keys) {
+        $value = $script:InstallerBoundParameters[$key]
+        if ($value -is [System.Management.Automation.SwitchParameter]) {
+            if ($value.IsPresent) {
+                $payload[$key] = $true
+            }
+            continue
+        }
+
+        if ($null -eq $value) {
+            continue
+        }
+
+        if ($value -is [System.Array] -and -not ($value -is [string])) {
+            $payload[$key] = @($value)
+            continue
+        }
+
+        $payload[$key] = $value
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ResolvedAction)) {
+        $payload["Action"] = $ResolvedAction
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
+        $payload["LogPath"] = $LogPath
+    }
+
+    if ($ForceSkipBaseInstall) {
+        $payload["SkipBaseInstall"] = $true
+    }
+
+    return $payload
+}
+
+function Invoke-InstallerRelaunchInPwsh {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ResolvedAction,
+        [switch]$ForceSkipBaseInstall
+    )
+
+    $pwshPath = Resolve-PwshExecutable
+    if (-not $pwshPath) {
+        return $false
+    }
+
+    $scriptPath = Resolve-InstallerScriptPath
+    $createdTempScript = $false
+    if (-not $scriptPath -and -not [string]::IsNullOrWhiteSpace($script:InstallerScriptText)) {
+        $scriptText = $script:InstallerScriptText
+        if (-not [string]::IsNullOrWhiteSpace($scriptText)) {
+            $tempScriptPath = Join-Path $env:TEMP ("windots-install-relaunch-{0}.ps1" -f ([guid]::NewGuid().ToString("N")))
+            Set-Content -Path $tempScriptPath -Value $scriptText -Encoding UTF8
+            $scriptPath = $tempScriptPath
+            $createdTempScript = $true
+        }
+    }
+
+    if (-not $scriptPath -or -not (Test-Path $scriptPath)) {
+        return $false
+    }
+
+    $payload = Get-InstallerRelaunchParameters -ResolvedAction $ResolvedAction -ForceSkipBaseInstall:$ForceSkipBaseInstall
+    $payloadPath = Join-Path $env:TEMP ("windots-install-args-{0}.json" -f ([guid]::NewGuid().ToString("N")))
+    $escapedScriptPath = $scriptPath.Replace("'", "''")
+    $escapedPayloadPath = $payloadPath.Replace("'", "''")
+
+    try {
+        $payload | ConvertTo-Json -Depth 16 | Set-Content -Path $payloadPath -Encoding UTF8
+
+        $relaunchCommand = @"
+`$ErrorActionPreference = 'Stop'
+`$relaunchData = Get-Content -Path '$escapedPayloadPath' -Raw -ErrorAction Stop | ConvertFrom-Json -AsHashtable
+`$invokeArgs = @{}
+foreach (`$key in `$relaunchData.Keys) {
+    `$value = `$relaunchData[`$key]
+    if (`$value -is [System.Collections.IEnumerable] -and -not (`$value -is [string])) {
+        `$invokeArgs[`$key] = @(`$value)
+    }
+    else {
+        `$invokeArgs[`$key] = `$value
+    }
+}
+& '$escapedScriptPath' @invokeArgs
+if (-not `$?) { exit 1 }
+"@
+
+        Log-Warn "PowerShell 7+ required. Relaunching installer in pwsh."
+        & $pwshPath -NoProfile -ExecutionPolicy Bypass -Command $relaunchCommand
+        $relaunchExitCode = $LASTEXITCODE
+        if ($relaunchExitCode -ne 0) {
+            throw "Relaunched pwsh installer exited with code $relaunchExitCode"
+        }
+
+        return $true
+    }
+    finally {
+        if (Test-Path $payloadPath) {
+            Remove-Item -Path $payloadPath -Force -ErrorAction SilentlyContinue
+        }
+
+        if ($createdTempScript -and (Test-Path $scriptPath)) {
+            Remove-Item -Path $scriptPath -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -599,6 +765,24 @@ function Invoke-InstallerPreflight {
 
     $errors = New-Object System.Collections.Generic.List[string]
 
+    $runtimeVersion = if ($PSVersionTable -and $PSVersionTable.PSVersion) {
+        $PSVersionTable.PSVersion
+    }
+    else {
+        [version]"0.0"
+    }
+
+    $runtimeEdition = if ($PSVersionTable) { $PSVersionTable.PSEdition } else { "Unknown" }
+    Log-Info ("powershell runtime: {0} {1}" -f $runtimeEdition, $runtimeVersion)
+    if ($runtimeVersion.Major -lt 7) {
+        if ($RequestedAction -eq "install") {
+            Log-Warn "PowerShell 7+ is required. Install flow will relaunch in pwsh after base dependencies are ensured."
+        }
+        else {
+            $errors.Add("Action '$RequestedAction' requires PowerShell 7+. Re-run this workflow with pwsh.")
+        }
+    }
+
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         $errors.Add("winget not found. Install App Installer first.")
     }
@@ -616,7 +800,7 @@ function Invoke-InstallerPreflight {
         Log-Warn "Unable to inspect execution policy: $($_.Exception.Message)"
     }
 
-    foreach ($commandName in @("git", "chezmoi", "pwsh")) {
+    foreach ($commandName in @("git", "chezmoi", "pwsh", "gum")) {
         if (Get-Command $commandName -ErrorAction SilentlyContinue) {
             Log-Info "command detected: $commandName"
             continue
@@ -852,6 +1036,17 @@ else {
     $true
 }
 
+if (-not (Test-RunningOnPowerShell7OrGreater) -and $resolvedAction -in @("install", "update", "restore")) {
+    $relaunchedToPwsh = Invoke-InstallerRelaunchInPwsh -ResolvedAction $resolvedAction
+    if ($relaunchedToPwsh) {
+        return
+    }
+
+    if ($resolvedAction -ne "install") {
+        throw "Action '$resolvedAction' requires PowerShell 7+ (pwsh), but pwsh could not be launched."
+    }
+}
+
 try {
     switch ($resolvedAction) {
         "quit" {
@@ -881,6 +1076,7 @@ try {
                 "twpayne.chezmoi",
                 "Git.Git",
                 "Microsoft.PowerShell",
+                "charmbracelet.gum",
                 "GitHub.cli"
             )
 
@@ -888,6 +1084,19 @@ try {
                 Ensure-WingetPackage -Id $pkg
             }
         }
+    }
+
+    if (-not (Test-RunningOnPowerShell7OrGreater)) {
+        $relaunchedAfterBaseInstall = Invoke-InstallerRelaunchInPwsh -ResolvedAction $resolvedAction -ForceSkipBaseInstall
+        if ($relaunchedAfterBaseInstall) {
+            return
+        }
+
+        if ($SkipBaseInstall) {
+            throw "PowerShell 7+ is required, but '-SkipBaseInstall' was set and pwsh is not available to relaunch."
+        }
+
+        throw "PowerShell 7+ is required. Base dependencies were installed, but pwsh could not be launched automatically."
     }
 
     Invoke-Step -Name "Resolving chezmoi executable" -Action {

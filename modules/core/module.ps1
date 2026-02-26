@@ -24,6 +24,7 @@ function Invoke-WindotsModuleCore {
 
     Assert-WindotsRequiredCommand -Name "chezmoi" | Out-Null
     Assert-WindotsRequiredCommand -Name "git" | Out-Null
+    Assert-WindotsRequiredCommand -Name "gum" | Out-Null
 
     if ($whatIf) {
         Log-Info "[core] WhatIf: would run 'chezmoi apply'."
