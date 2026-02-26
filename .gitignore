@@ -6,6 +6,11 @@
 **/id_rsa
 **/id_ed25519
 **/known_hosts
+**/.env
+**/.env.local
+**/*.tfstate
+**/*.tfstate.*
+**/.terraform/
 
 # Local private overrides
 *.local.*

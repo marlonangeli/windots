@@ -1,5 +1,6 @@
 [tools]
 powershell-core = "latest"
+terraform = "latest"
 
 [tasks.bootstrap]
 description = "Run full windots bootstrap"
