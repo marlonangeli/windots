@@ -13,6 +13,14 @@ run = "pwsh -NoProfile -File ./scripts/validate.ps1"
 description = "Run module registry validation"
 run = "pwsh -NoProfile -File ./scripts/validate-modules.ps1"
 
+[tasks.lint]
+description = "Lint PowerShell code"
+run = "pwsh -NoProfile -File ./scripts/lint.ps1"
+
+[tasks.format]
+description = "Format PowerShell code"
+run = "pwsh -NoProfile -File ./scripts/format.ps1"
+
 [tasks.test]
 description = "Run full local test suite"
 run = "pwsh -NoProfile -File ./tests/run.ps1"

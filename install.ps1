@@ -237,7 +237,7 @@ function Ensure-WingetPackage {
     param([Parameter(Mandatory)][string]$Id)
 
     $hasWingetWrapper = $null -ne (Get-Command Test-WingetPackageInstalled -ErrorAction SilentlyContinue) -and
-        $null -ne (Get-Command Invoke-WingetInstall -ErrorAction SilentlyContinue)
+    $null -ne (Get-Command Invoke-WingetInstall -ErrorAction SilentlyContinue)
 
     $installed = $false
     if ($hasWingetWrapper) {

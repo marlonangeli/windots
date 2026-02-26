@@ -34,7 +34,8 @@ $chezmoiIgnorePath = Join-Path $repoRoot "home\.chezmoiignore"
 
 if (-not (Test-Path $gitignorePath)) {
     Write-Status -Name ".gitignore" -Ok $false -Message "file not found"
-} else {
+}
+else {
     $gitignore = Get-Content $gitignorePath -Raw
     $hasCore = @("**/auth.json", "**/*.token", "**/.jira_access_token", "home/dot_ssh/id_*") | ForEach-Object {
         $gitignore -match [regex]::Escape($_)
@@ -46,7 +47,8 @@ if (-not (Test-Path $gitignorePath)) {
 
 if (-not (Test-Path $chezmoiIgnorePath)) {
     Write-Status -Name "home/.chezmoiignore" -Ok $false -Message "file not found"
-} else {
+}
+else {
     $chezIgnore = Get-Content $chezmoiIgnorePath -Raw
     $ok = $chezIgnore -match "home/dot_codex/auth\.json"
     if (-not $ok) {

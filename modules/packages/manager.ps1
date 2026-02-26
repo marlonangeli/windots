@@ -157,9 +157,15 @@ function Test-WindotsPackageInstalled {
     }
 
     switch ($Package.Provider) {
-        'winget' { return (Test-WindotsWingetInstalled -Package $Package) }
-        'mise' { return (Test-WindotsMiseInstalled -Package $Package) }
-        default { throw "Unsupported provider '$($Package.Provider)'" }
+        'winget' {
+            return (Test-WindotsWingetInstalled -Package $Package)
+        }
+        'mise' {
+            return (Test-WindotsMiseInstalled -Package $Package)
+        }
+        default {
+            throw "Unsupported provider '$($Package.Provider)'"
+        }
     }
 }
 
@@ -168,9 +174,15 @@ function Install-WindotsPackage {
     param([Parameter(Mandatory)][hashtable]$Package)
 
     switch ($Package.Provider) {
-        'winget' { Install-WindotsWingetPackage -Package $Package; return }
-        'mise' { Install-WindotsMisePackage -Package $Package; return }
-        default { throw "Unsupported provider '$($Package.Provider)'" }
+        'winget' {
+            Install-WindotsWingetPackage -Package $Package; return
+        }
+        'mise' {
+            Install-WindotsMisePackage -Package $Package; return
+        }
+        default {
+            throw "Unsupported provider '$($Package.Provider)'"
+        }
     }
 }
 
@@ -216,7 +228,12 @@ function Ensure-WindotsModulePackages {
 
     foreach ($pkg in $packages) {
         $pkgHt = [hashtable]$pkg
-        $packageLabel = if ($pkgHt.Name) { $pkgHt.Name } else { $pkgHt.PackageId }
+        $packageLabel = if ($pkgHt.Name) {
+            $pkgHt.Name
+        }
+        else {
+            $pkgHt.PackageId
+        }
 
         if ($useSelectionFilter -and -not $pkgHt.Required) {
             if ($pkgHt.Name.ToLowerInvariant() -notin $normalizedSelected) {
