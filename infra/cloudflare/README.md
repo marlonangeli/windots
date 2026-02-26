@@ -29,7 +29,7 @@ terraform -chdir=infra/cloudflare apply -var-file=env/prod.tfvars
 
 Workflow: `.github/workflows/infra-cloudflare.yml`.
 
-Expected GitHub environment (`production`) values:
+Expected GitHub environment (`stable`) values:
 
 - `BWS_ACCESS_TOKEN`
 - `BWS_CLOUDFLARE_ILEGNA_DEV_API_TOKEN`

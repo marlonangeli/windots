@@ -30,11 +30,11 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: validate
     runs-on: ubuntu-latest
-    environment: production
+    environment: stable
     permissions:
       contents: read
     concurrency:
-      group: infra-cloudflare-production
+      group: infra-cloudflare-stable
       cancel-in-progress: false
     defaults:
       run:
