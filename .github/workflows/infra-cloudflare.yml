@@ -1,0 +1,91 @@
+name: infra-cloudflare
+
+on:
+  pull_request:
+    paths:
+      - "infra/cloudflare/**"
+      - ".github/workflows/infra-cloudflare.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform format check
+        run: terraform -chdir=infra/cloudflare fmt -check -recursive
+
+      - name: Terraform init (no backend)
+        run: terraform -chdir=infra/cloudflare init -backend=false
+
+      - name: Terraform validate
+        run: terraform -chdir=infra/cloudflare validate
+
+  apply:
+    if: github.event_name == 'workflow_dispatch'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    concurrency:
+      group: infra-cloudflare-production
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Load secrets from Bitwarden Secrets Manager
+        uses: bitwarden/sm-action@v2
+        with:
+          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          secrets: |
+            ${{ vars.BWS_CLOUDFLARE_ILEGNA_DEV_API_TOKEN || secrets.BWS_CLOUDFLARE_ILEGNA_DEV_API_TOKEN }} > CLOUDFLARE_API_TOKEN
+            ${{ vars.BWS_CLOUDFLARE_ILEGNA_DEV_ZONE_ID || secrets.BWS_CLOUDFLARE_ILEGNA_DEV_ZONE_ID }} > TF_VAR_zone_id
+
+      - name: Terraform init
+        run: terraform -chdir=infra/cloudflare init
+
+      - name: Import existing resources if present
+        run: |
+          set -euo pipefail
+
+          zone_id="${TF_VAR_zone_id}"
+          hostname="windots.ilegna.dev"
+
+          api_get() {
+            local endpoint="$1"
+            curl --silent --show-error --fail \
+              --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              --header "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4${endpoint}"
+          }
+
+          a_record_id="$(api_get "/zones/${zone_id}/dns_records?type=A&name=${hostname}" | jq -r '.result[0].id // empty')"
+          if [[ -n "${a_record_id}" ]]; then
+            terraform -chdir=infra/cloudflare import "cloudflare_dns_record.windots_placeholder_a" "${zone_id}/${a_record_id}" || true
+          fi
+
+          aaaa_record_id="$(api_get "/zones/${zone_id}/dns_records?type=AAAA&name=${hostname}" | jq -r '.result[0].id // empty')"
+          if [[ -n "${aaaa_record_id}" ]]; then
+            terraform -chdir=infra/cloudflare import "cloudflare_dns_record.windots_placeholder_aaaa" "${zone_id}/${aaaa_record_id}" || true
+          fi
+
+          ruleset_id="$(api_get "/zones/${zone_id}/rulesets" | jq -r '[.result[] | select(.phase == "http_request_dynamic_redirect" and .kind == "zone")][0].id // empty')"
+          if [[ -n "${ruleset_id}" ]]; then
+            terraform -chdir=infra/cloudflare import "cloudflare_ruleset.windots_redirect" "zone/${zone_id}/${ruleset_id}" || true
+          fi
+
+      - name: Terraform plan
+        run: terraform -chdir=infra/cloudflare plan -var-file=env/prod.tfvars -out=tfplan
+
+      - name: Terraform apply
+        run: terraform -chdir=infra/cloudflare apply -auto-approve tfplan
