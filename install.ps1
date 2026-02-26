@@ -3,7 +3,8 @@ param(
     [string]$Repo = "marlonangeli/windots",
 
     [ValidateSet("menu", "install", "update", "restore", "quit")]
-    [string]$Action,
+    [Alias("Action")]
+    [string]$InstallerAction,
 
     [string]$Branch = "main",
     [string]$Ref,
@@ -929,8 +930,12 @@ function Resolve-InstallerAction {
     [CmdletBinding()]
     param()
 
-    if ($script:InstallerBoundParameters.ContainsKey("Action") -and -not [string]::IsNullOrWhiteSpace($Action)) {
-        return $Action.Trim().ToLowerInvariant()
+    if ($script:InstallerBoundParameters.ContainsKey("InstallerAction") -and -not [string]::IsNullOrWhiteSpace($InstallerAction)) {
+        return $InstallerAction.Trim().ToLowerInvariant()
+    }
+
+    if ($script:InstallerBoundParameters.ContainsKey("Action") -and -not [string]::IsNullOrWhiteSpace($InstallerAction)) {
+        return $InstallerAction.Trim().ToLowerInvariant()
     }
 
     $installSwitches = @(
