@@ -45,3 +45,5 @@ Current credentials expire on `2027-02-26`.
 - Rotate `BWS_ACCESS_TOKEN` (machine access token) before expiry.
 - Keep secret IDs the same when possible to avoid workflow changes.
 - After rotation, run `workflow_dispatch` once to confirm successful access.
+
+GitHub automation reminder: `.github/workflows/credential-rotation-alert.yml` opens a reminder issue when less than 60 days remain.
