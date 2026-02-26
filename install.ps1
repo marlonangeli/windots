@@ -2,7 +2,6 @@
 param(
     [string]$Repo = "marlonangeli/windots",
 
-    [ValidateSet("menu", "install", "update", "restore", "quit")]
     [Alias("Action")]
     [string]$InstallerAction,
 
@@ -11,7 +10,6 @@ param(
     [switch]$RequireNonMain,
     [string]$LocalRepoPath,
 
-    [ValidateSet("full", "clean")]
     [string]$Mode = "full",
 
     [switch]$SkipBaseInstall,
@@ -199,6 +197,30 @@ function Assert-LocalRepoPath {
     $marker = Join-Path $PathValue ".chezmoiroot"
     if (-not (Test-Path $marker)) {
         throw "LocalRepoPath must contain .chezmoiroot: $PathValue"
+    }
+}
+
+function Assert-InstallerParameterValues {
+    $validActions = @("menu", "install", "update", "restore", "quit")
+    if (-not [string]::IsNullOrWhiteSpace($InstallerAction)) {
+        $normalizedAction = $InstallerAction.Trim().ToLowerInvariant()
+        if ($normalizedAction -notin $validActions) {
+            throw "Invalid Action '$InstallerAction'. Allowed values: $($validActions -join ', ')"
+        }
+        $script:InstallerAction = $normalizedAction
+        $script:InstallerBoundParameters["InstallerAction"] = $normalizedAction
+    }
+
+    $validModes = @("full", "clean")
+    if ([string]::IsNullOrWhiteSpace($Mode)) {
+        $script:Mode = "full"
+    }
+    else {
+        $normalizedMode = $Mode.Trim().ToLowerInvariant()
+        if ($normalizedMode -notin $validModes) {
+            throw "Invalid Mode '$Mode'. Allowed values: $($validModes -join ', ')"
+        }
+        $script:Mode = $normalizedMode
     }
 }
 
@@ -1010,6 +1032,7 @@ function Invoke-WindotsWrapperCommand {
 }
 
 Assert-SafeRepoName -Value $Repo
+Assert-InstallerParameterValues
 Assert-SafeRefName -Value $Branch -Label "Branch"
 if (-not [string]::IsNullOrWhiteSpace($Ref)) {
     Assert-SafeRefName -Value $Ref -Label "Ref"
