@@ -1,12 +1,22 @@
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": true,
+  "mcp": {
     "git": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-git"]
+      "enabled": false,
+      "type": "local",
+      "command": ["uvx", "mcp-server-git"]
     },
     "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "{{ .chezmoi.homeDir }}"]
+      "enabled": true,
+      "type": "local",
+      "command": [
+        "bun",
+        "x",
+        "@modelcontextprotocol/server-filesystem",
+        "{{ .chezmoi.homeDir }}",
+        "C:/git"
+      ]
     }
   }
 }
