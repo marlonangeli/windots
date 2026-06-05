@@ -34,9 +34,5 @@ else {
     Log-Info "mise shims already present in user PATH."
 }
 
-try {
-    mise activate pwsh | Out-String | Invoke-Expression
-}
-catch {
-    Log-Warn "mise activate pwsh failed in this session."
-}
+$env:MISE_NOT_FOUND_AUTO_INSTALL = "0"
+Log-Info "mise configured for shims/PATH. Set MISE_ACTIVATE=1 before pwsh to opt into prompt-time activation."

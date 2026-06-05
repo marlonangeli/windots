@@ -1,0 +1,26 @@
+add_newline = false
+command_timeout = 800
+
+[character]
+success_symbol = "[>](bold green)"
+error_symbol = "[>](bold red)"
+
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+
+[git_branch]
+symbol = "git:"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+format = "[$all_status$ahead_behind]($style) "
+
+[nodejs]
+format = "[node $version]($style) "
+
+[python]
+format = "[py $version]($style) "
+
+[dotnet]
+format = "[dotnet $version]($style) "

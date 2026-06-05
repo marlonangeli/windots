@@ -1,0 +1,33 @@
+default_layout "dev"
+pane_frames false
+mouse_mode true
+copy_on_select false
+
+keybinds {
+    normal {
+        bind "Alt n" { NewPane; }
+        bind "Alt x" { CloseFocus; }
+        bind "Alt h" { MoveFocus "Left"; }
+        bind "Alt j" { MoveFocus "Down"; }
+        bind "Alt k" { MoveFocus "Up"; }
+        bind "Alt l" { MoveFocus "Right"; }
+    }
+}
+
+theme "catppuccin-mocha"
+
+themes {
+    catppuccin-mocha {
+        fg 205 214 244
+        bg 30 30 46
+        black 69 71 90
+        red 243 139 168
+        green 166 227 161
+        yellow 249 226 175
+        blue 137 180 250
+        magenta 245 194 231
+        cyan 148 226 213
+        white 186 194 222
+        orange 250 179 135
+    }
+}

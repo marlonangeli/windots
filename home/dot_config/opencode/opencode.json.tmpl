@@ -1,12 +1,22 @@
 {
-  "mcpServers": {
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "~/.config/ai/AGENTS.md"
+  ],
+  "skills": {
+    "paths": ["~/.config/ai/skills"]
+  },
+  "mcp": {
     "git": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-git"]
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-git"],
+      "enabled": true
     },
     "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "{{ .chezmoi.homeDir }}"]
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", {{ .chezmoi.homeDir | quote }}],
+      "enabled": true
     }
   }
 }

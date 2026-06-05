@@ -24,11 +24,11 @@ function Invoke-WindotsModuleThemes {
     }
 
     if ($Context.WhatIf) {
-        Log-Info "[themes] WhatIf: would configure oh-my-posh theme."
+        Log-Info "[themes] WhatIf: would verify Starship theme config."
         return
     }
 
-    Log-Step "[themes] Configuring oh-my-posh"
+    Log-Step "[themes] Verifying Starship config"
     & $scriptPath
     if (-not $?) {
         throw "[themes] setup failed."

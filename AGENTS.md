@@ -7,6 +7,7 @@ This is a Windows dotfiles repo managed by `chezmoi` plus PowerShell automation.
 2. `chezmoi apply` materializes those templates on the local machine.
 3. `scripts/bootstrap.ps1` optionally installs tools, reapplies config, and syncs AI config folders.
 4. `scripts/validate.ps1` enforces baseline integrity and secret-pattern checks (also in CI).
+5. `scripts/ilegna.ps1` owns day-to-day workflow commands and is intentionally portable.
 
 Recommended first run:
 
@@ -18,28 +19,28 @@ pwsh ./scripts/validate.ps1
 
 ## Project Structure & Module Organization
 - `home/`: source-of-truth templates for shell, git, terminal, editors, AI/MCP.
-- `scripts/`: repo operations (`bootstrap`, `run-modules`, `validate`, `windots`, `export-current`) and shared helpers.
+- `scripts/`: repo operations (`bootstrap`, `run-modules`, `validate`, `windots`) plus standalone helpers such as `ilegna`.
 - `modules/<name>/`: module entrypoint plus module-owned scripts/config files.
 - `docs/`: setup, migration, secrets, and architecture decisions.
-- `home/dot_config/powershell/`: modular profile and workflow modules.
+- `home/dot_config/powershell/`: `profile.d`-based PowerShell profile.
 - `.github/workflows/validate.yml`: runs `scripts/validate.ps1` on push/PR.
 
 ## Build, Test, and Development Commands
 - `chezmoi init --source .`: develop from local repo source.
 - `chezmoi diff`: preview file changes.
 - `chezmoi apply`: apply templates.
+- `pwsh ./scripts/ilegna.ps1 config backup`: back up current local Git/SSH config before applying dotfiles.
 - `pwsh ./scripts/bootstrap.ps1 -Mode full`: full setup.
 - `pwsh ./scripts/bootstrap.ps1 -Mode clean -SkipInstall`: reconfigure without package install.
+- `pwsh ./scripts/ilegna.ps1 doctor`: check local workflow tools.
+- `pwsh ./scripts/ilegna.ps1 wt new feat/example --base main`: create a worktree.
 - `pwsh ./modules/ai/link-configs.ps1 -UseSymlink`: symlink AI config dirs instead of copying.
 - `pwsh ./scripts/validate.ps1`: mandatory validation before commit/PR.
 
 ## PowerShell Profile Behavior
-- Modes: `full` (imports workflow modules) and `clean` (core only).
+- Modes: `full` and `clean`, loaded through explicit `profile.d/*.ps1` files.
 - Mode commands: `pmode`, `pclean`, `pfull`, `reload`.
-- Workflow modules in `home/dot_config/powershell/modules/`:
-  - `worktrees.psm1`
-  - `time-tracker.psm1`
-  - `pr-workflow.psm1`
+- Workflow helpers use `ilegna <resource> <command> <args>` instead of profile modules.
 
 ## Coding Style & Naming Conventions
 - PowerShell: 4-space indentation, `[CmdletBinding()]`, explicit `param(...)`.

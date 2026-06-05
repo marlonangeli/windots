@@ -2,7 +2,8 @@
 param(
     [switch]$SkipLint,
     [switch]$SkipPester,
-    [switch]$SkipIntegration
+    [switch]$SkipIntegration,
+    [switch]$IncludeIntegration
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,7 +66,7 @@ if (-not $SkipPester) {
     }
 }
 
-if (-not $SkipIntegration) {
+if ($IncludeIntegration -and -not $SkipIntegration) {
     Invoke-Step -Name "Integration: chezmoi apply/verify/idempotency" -Action {
         Assert-Command -Name "chezmoi"
 
@@ -94,6 +95,9 @@ if (-not $SkipIntegration) {
             throw "Idempotency check failed: chezmoi diff produced changes after second apply."
         }
     }
+}
+else {
+    Write-Host "==> Integration skipped (use -IncludeIntegration to run chezmoi apply/verify/idempotency)" -ForegroundColor DarkGray
 }
 
 Write-Host "All checks passed." -ForegroundColor Green

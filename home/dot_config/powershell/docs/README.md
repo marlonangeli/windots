@@ -1,13 +1,13 @@
-# PowerShell Profile Documentation
+# PowerShell Profile
 
-## Overview
+The profile is a small loader plus explicit scripts in `profile.d`.
 
-This profile is loaded from `home/dot_config/powershell/Microsoft.PowerShell_profile.ps1` and supports two modes:
+Modes:
 
-- `full`: imports `worktrees`, `time-tracker`, and `pr-workflow`
-- `clean`: loads only core config, aliases, and utils
+- `full`: shell basics, prompt, git/dev/AI helpers, and the `ilegna` CLI shim.
+- `clean`: shell basics, prompt, aliases, and the `ilegna` CLI shim only.
 
-Mode commands:
+Commands:
 
 ```powershell
 pmode
@@ -16,52 +16,35 @@ pfull
 reload
 ```
 
-## Directory Layout
-
-```text
-home/dot_config/powershell/
-  Microsoft.PowerShell_profile.ps1
-  modules/
-    config.ps1
-    aliases.ps1
-    utils.ps1
-    worktrees.psm1
-    time-tracker.psm1
-    pr-workflow.psm1
-  docs/
-```
-
-## Module Summary
-
-- `config.ps1`: env vars, PSReadLine, lazy Oh-My-Posh, lazy zoxide/mise
-- `aliases.ps1`: git/docker/dotnet/node/navigation shortcuts
-- `utils.ps1`: helper commands (`la`, `ll`, `mkcd`, `edit`, `ep`, `reload`)
-- `worktrees.psm1`: create/open/remove/list/switch git worktrees
-- `time-tracker.psm1`: start/stop/pause/resume/reset work timers and Jira log
-- `pr-workflow.psm1`: branch + PR workflow for Azure DevOps
-
-## Quick Commands
+Debug startup time:
 
 ```powershell
-# Worktrees
-New-Worktree -BranchName feat/AL-123-example
-Get-WorktreeStatus
-
-# Time tracking
-Start-Work -IssueKey AL-123 -Description "Implement auth"
-Pause-Work
-Resume-Work
-Stop-Work -IssueKey AL-123
-
-# PR workflow
-New-Feature -Name "oauth" -Type feat -IssueKey AL-123
-Test-DevConflict
-New-PR -Target develop -IssueKey AL-123
+$env:WINDOTS_PROFILE_DEBUG = "1"
+pwsh
 ```
 
-## Related Docs
+Layout:
 
-- [Interactive usage](./INTERACTIVE_USAGE.md)
-- [PR workflow](./PR_WORKFLOW.md)
-- [Time tracking](./TIME_TRACKING.md)
-- [Changelog](./CHANGELOG.md)
+```text
+~/.config/powershell/
+  Microsoft.PowerShell_profile.ps1
+  profile.d/
+    00-core.ps1
+    10-env.ps1
+    20-path.ps1
+    30-prompt.ps1
+    40-aliases.ps1
+    50-git.ps1
+    60-dev.ps1
+    70-ai.ps1
+    80-ilegna.ps1
+```
+
+Workflow commands live in `scripts/ilegna.ps1` instead of large profile modules:
+
+```powershell
+ilegna wt new feat/fun-cli --base main
+ilegna pr new --base develop
+ilegna pipeline list
+ilegna jira start ABC-123 "small task"
+```
