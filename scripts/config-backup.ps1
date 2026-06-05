@@ -31,6 +31,7 @@ function Get-BackupCatalog {
         [pscustomobject]@{ Name = "gitconfig-local"; Group = "git"; Source = Join-Path $HOME ".gitconfig.local"; BackupPath = "git/.gitconfig.local" },
         [pscustomobject]@{ Name = "gitignore-global"; Group = "git"; Source = Join-Path $HOME ".gitignore_global"; BackupPath = "git/.gitignore_global" },
         [pscustomobject]@{ Name = "ssh-config"; Group = "ssh"; Source = Join-Path $HOME ".ssh\config"; BackupPath = "ssh/config" },
+        [pscustomobject]@{ Name = "ssh-config-local"; Group = "ssh"; Source = Join-Path $HOME ".ssh\config.local"; BackupPath = "ssh/config.local" },
         [pscustomobject]@{ Name = "ssh-known-hosts"; Group = "ssh"; Source = Join-Path $HOME ".ssh\known_hosts"; BackupPath = "ssh/known_hosts" },
         [pscustomobject]@{ Name = "ssh-config-dir"; Group = "ssh"; Source = Join-Path $HOME ".ssh\config.d"; BackupPath = "ssh/config.d" }
     )
@@ -57,7 +58,7 @@ function Resolve-BackupItems {
     foreach ($item in $requested) {
         $matches = @($catalog | Where-Object { $_.Name -eq $item -or $_.Group -eq $item })
         if (-not $matches -or $matches.Count -eq 0) {
-            throw "Unknown backup item '$item'. Use: all, git, ssh, gitconfig, gitconfig-local, gitignore-global, ssh-config, ssh-known-hosts, ssh-config-dir."
+            throw "Unknown backup item '$item'. Use: all, git, ssh, gitconfig, gitconfig-local, gitignore-global, ssh-config, ssh-config-local, ssh-known-hosts, ssh-config-dir."
         }
         $resolved += $matches
     }

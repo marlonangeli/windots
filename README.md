@@ -77,7 +77,7 @@ Backups are local only and are written to `%LOCALAPPDATA%\windots\backups\config
 Included by default:
 
 - `.gitconfig`, `.gitconfig.local`, `.gitignore_global`
-- `.ssh/config`, `.ssh/known_hosts`, `.ssh/config.d/`
+- `.ssh/config`, `.ssh/config.local`, `.ssh/known_hosts`, `.ssh/config.d/`
 
 Restore a specific backup:
 

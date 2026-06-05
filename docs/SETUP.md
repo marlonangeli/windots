@@ -106,7 +106,7 @@ Run this before the first `chezmoi apply` on a machine that already has custom G
 ilegna config backup
 ```
 
-Backups live in `%LOCALAPPDATA%\windots\backups\configs` and include Git config plus SSH host config files, but not private SSH keys.
+Backups live in `%LOCALAPPDATA%\windots\backups\configs` and include Git config plus SSH host config files such as `.ssh/config.local`, but not private SSH keys.
 
 ```powershell
 ilegna config list
