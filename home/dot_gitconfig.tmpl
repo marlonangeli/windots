@@ -2,7 +2,7 @@
 	autocrlf = true
 	symlinks = true
 	longpaths = true
-	excludesfile = {{ .chezmoi.homeDir | quote }} + "\\.gitignore_global"
+	excludesfile = {{ printf "%s/.gitignore_global" .chezmoi.homeDir | quote }}
 	pager = delta
 [user]
 	name = {{ .name | quote }}
@@ -36,4 +36,4 @@
 	d = diff
 	l = log --oneline --graph --decorate -n 20
 [include]
-	path = ~/.gitconfig.local
+	path = {{ printf "%s/.gitconfig.local" .chezmoi.homeDir | quote }}
