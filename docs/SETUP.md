@@ -61,6 +61,8 @@ pwsh -NoProfile -File ./install.ps1 -RequireNonMain -Branch feature/my-change -A
 ## Manual Bootstrap
 
 ```powershell
+pwsh ./scripts/link.ps1 -Diff
+pwsh ./scripts/link.ps1 -Apply
 pwsh ./scripts/bootstrap.ps1 -Mode full
 ```
 

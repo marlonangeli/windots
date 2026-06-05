@@ -36,6 +36,8 @@ Quick local link:
 pwsh ./scripts/link.ps1 -Apply
 ```
 
+This sets `WINDOTS_REPO_ROOT` for the profile and applies dotfiles using the local repository as the `chezmoi` source.
+
 ## Daily Commands
 
 ```powershell
