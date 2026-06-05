@@ -86,6 +86,8 @@ $requiredFiles = @(
     "home/dot_config/starship.toml",
     "home/dot_config/zellij/config.kdl",
     "home/dot_config/zellij/layouts/dev.kdl",
+    "home/dot_config/zellij/layouts/opencode-terminal.kdl",
+    "home/dot_config/zellij/layouts/terminal-grid.kdl",
     "home/dot_wslconfig",
     "tests/run.ps1",
     "tests/smoke.ps1",

@@ -52,7 +52,7 @@ function Split-IlegnaArgs {
     [CmdletBinding()]
     param([string[]]$InputArgs)
 
-    $inputList = if ($null -eq $InputArgs) { @() } else { @($InputArgs) }
+    [string[]]$inputList = if ($null -eq $InputArgs) { @() } else { @($InputArgs) }
     $positionals = New-Object System.Collections.Generic.List[string]
     $options = @{}
     $flags = New-Object System.Collections.Generic.HashSet[string]([System.StringComparer]::OrdinalIgnoreCase)
@@ -61,11 +61,12 @@ function Split-IlegnaArgs {
         $item = $inputList[$i]
         if ([string]::IsNullOrWhiteSpace($item)) { continue }
 
+        $item = $item.ToString()
         if ($item.StartsWith("--")) {
             $name = $item.Substring(2)
             if ([string]::IsNullOrWhiteSpace($name)) { continue }
 
-            $next = if ($i + 1 -lt $inputList.Count) { $inputList[$i + 1] } else { $null }
+            $next = if ($i + 1 -lt $inputList.Count) { $inputList[$i + 1].ToString() } else { $null }
             if ($next -and -not $next.StartsWith("-")) {
                 $options[$name] = $next
                 $i++
@@ -163,6 +164,18 @@ function Get-CurrentBranch {
     }
 
     return $null
+}
+
+function Get-RepositoryHost {
+    [CmdletBinding()]
+    param()
+
+    $remote = git remote get-url origin 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($remote)) { return "unknown" }
+
+    if ($remote -match 'dev\.azure\.com|\.visualstudio\.com|azuredevops') { return "azure" }
+    if ($remote -match 'github\.com[:/]') { return "github" }
+    return "unknown"
 }
 
 function Get-WorktreePathByBranch {
@@ -358,20 +371,57 @@ function Invoke-IlegnaPipeline {
     )
 
     if ([string]::IsNullOrWhiteSpace($Subcommand)) { $Subcommand = "list" }
+    $hostName = Get-RepositoryHost
+    $parsed = Split-IlegnaArgs -InputArgs $InputArgs
+
+    function Get-PipelineRunId {
+        $id = Get-IlegnaOption -Parsed $parsed -Names @("id", "run")
+        if (-not [string]::IsNullOrWhiteSpace($id)) { return $id }
+        return ($parsed.Positionals | Select-Object -First 1)
+    }
 
     switch ($Subcommand.ToLowerInvariant()) {
         "list" {
+            if ($hostName -eq "azure") {
+                if (Get-Command az -ErrorAction SilentlyContinue) { az pipelines runs list @InputArgs; return }
+                throw "This looks like an Azure repo, but az was not found."
+            }
+            if ($hostName -eq "github") {
+                if (Get-Command gh -ErrorAction SilentlyContinue) { gh run list @InputArgs; return }
+                throw "This looks like a GitHub repo, but gh was not found."
+            }
             if (Get-Command gh -ErrorAction SilentlyContinue) { gh run list @InputArgs; return }
             if (Get-Command az -ErrorAction SilentlyContinue) { az pipelines runs list @InputArgs; return }
             throw "Install gh or az to list pipeline runs."
         }
         "watch" {
+            if ($hostName -eq "azure") {
+                if (-not (Get-Command az -ErrorAction SilentlyContinue)) { throw "This looks like an Azure repo, but az was not found." }
+                $runId = Get-PipelineRunId
+                if ([string]::IsNullOrWhiteSpace($runId)) { throw "Usage: ilegna pipeline watch <run-id>" }
+
+                while ($true) {
+                    $run = az pipelines runs show --id $runId --query "{id:id,status:status,result:result,branch:sourceBranch}" -o json | ConvertFrom-Json
+                    Write-IlegnaLine ("{0} status={1} result={2} branch={3}" -f $run.id, $run.status, $run.result, $run.branch) Cyan
+                    if ($run.status -eq "completed") { return }
+                    Start-Sleep -Seconds 10
+                }
+            }
+
             if (Get-Command gh -ErrorAction SilentlyContinue) { gh run watch @InputArgs; return }
-            throw "Install gh to watch pipeline runs."
+            throw "Install gh to watch GitHub Actions runs."
         }
-        "open" {
+        { $_ -in @("open", "view") } {
+            if ($hostName -eq "azure") {
+                if (-not (Get-Command az -ErrorAction SilentlyContinue)) { throw "This looks like an Azure repo, but az was not found." }
+                $runId = Get-PipelineRunId
+                if ([string]::IsNullOrWhiteSpace($runId)) { throw "Usage: ilegna pipeline open <run-id>" }
+                az pipelines runs show --id $runId --open
+                return
+            }
+
             if (Get-Command gh -ErrorAction SilentlyContinue) { gh run view --web @InputArgs; return }
-            throw "Install gh to open pipeline runs."
+            throw "Install gh to open GitHub Actions runs."
         }
         default {
             throw "Unknown pipeline command: $Subcommand"

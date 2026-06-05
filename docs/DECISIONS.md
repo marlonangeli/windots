@@ -62,8 +62,9 @@
 ## 10) Fast Shell Startup
 
 - `mise` uses shims/PATH by default.
-- `mise activate` only runs when `MISE_ACTIVATE=1` is set.
-- Starship and Zoxide use their official PowerShell init scripts in interactive sessions.
+- `mise activate` runs only when `Enable-MiseActivation` is called manually.
+- Starship runs only when `Enable-StarshipPrompt` is called or `WINDOTS_STARSHIP=1` is set.
+- Zoxide initializes lazily the first time `z` or `zi` is called.
 
 ## 11) Local Config Safety
 

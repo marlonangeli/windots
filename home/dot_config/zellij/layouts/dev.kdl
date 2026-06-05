@@ -8,7 +8,9 @@ layout {
 
     tab name="dev" {
         pane split_direction="vertical" {
-            pane
+            pane command="pwsh" {
+                args "-NoLogo"
+            }
             pane size="35%" command="pwsh" {
                 args "-NoLogo"
             }

@@ -1,4 +1,5 @@
 default_layout "dev"
+default_shell "pwsh"
 pane_frames false
 mouse_mode true
 copy_on_select false

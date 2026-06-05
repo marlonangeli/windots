@@ -94,6 +94,16 @@ Restore asks before overwriting existing files and saves pre-restore copies. Use
 
 Keep personal Git aliases/scripts in `~/.gitconfig.local`; the managed `.gitconfig` includes it and chezmoi does not manage that local file.
 
+## Zellij Layouts
+
+```powershell
+zellij --layout dev
+zellij --layout opencode-terminal
+zellij --layout terminal-grid
+```
+
+The Zellij config sets `pwsh` as the default shell. `opencode-terminal` opens OpenCode next to two PowerShell panes.
+
 ## What Gets Managed
 
 - `home/`: chezmoi source for files under `%USERPROFILE%`.
@@ -125,11 +135,11 @@ $env:WINDOTS_PROFILE_DEBUG = "1"
 pwsh
 ```
 
-`mise` uses shims/PATH by default. Prompt-time activation only runs when requested:
+Startup avoids external init scripts by default. `mise` uses shims/PATH; run activation only inside a shell that needs it:
 
 ```powershell
-$env:MISE_ACTIVATE = "1"
-pwsh
+Enable-MiseActivation
+Enable-StarshipPrompt
 ```
 
 ## Module Bootstrap

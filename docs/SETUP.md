@@ -118,6 +118,16 @@ ilegna config restore latest --items ssh
 
 `restore` prompts before overwriting and stores a `pre-restore-*` copy of files it replaces. Put custom Git aliases/scripts in `~/.gitconfig.local`; windots includes that file without managing it.
 
+## Zellij Layouts
+
+```powershell
+zellij --layout dev
+zellij --layout opencode-terminal
+zellij --layout terminal-grid
+```
+
+The layouts use `pwsh`; `opencode-terminal` opens OpenCode next to terminal panes.
+
 ## Validation
 
 ```powershell
