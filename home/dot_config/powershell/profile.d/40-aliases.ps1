@@ -6,6 +6,18 @@ Set-Alias mi mise -Force -ErrorAction SilentlyContinue
 Remove-Item Alias:ls -Force -ErrorAction SilentlyContinue
 Remove-Item Alias:dir -Force -ErrorAction SilentlyContinue
 
+$global:__WindotsEzaPath = $null
+$ezaInstallRoot = Join-Path $env:LOCALAPPDATA "mise\installs\eza"
+if (Test-Path $ezaInstallRoot) {
+    $ezaInstall = Get-ChildItem -Path $ezaInstallRoot -Directory -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    if ($ezaInstall) {
+        $ezaExe = Join-Path $ezaInstall.FullName "bin\eza.exe"
+        if (Test-Path $ezaExe) { $global:__WindotsEzaPath = $ezaExe }
+    }
+}
+
 function gs { git status -sb @args }
 function ga { git add @args }
 function gaa { git add . @args }
@@ -28,7 +40,8 @@ function docs { Set-Location (Join-Path $HOME "Documents") }
 function dl { Set-Location (Join-Path $HOME "Downloads") }
 
 function ls {
-    if (Get-Command eza -ErrorAction SilentlyContinue) { eza --icons --group-directories-first @args; return }
+    $eza = $global:__WindotsEzaPath
+    if ($eza) { & $eza --icons --group-directories-first @args; return }
     Get-ChildItem @args
 }
 
@@ -36,7 +49,8 @@ function dir { ls @args }
 function ll { ls @args }
 
 function la {
-    if (Get-Command eza -ErrorAction SilentlyContinue) { eza --all --icons --group-directories-first @args; return }
+    $eza = $global:__WindotsEzaPath
+    if ($eza) { & $eza --all --icons --group-directories-first @args; return }
     Get-ChildItem -Force @args
 }
 

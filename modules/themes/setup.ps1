@@ -14,8 +14,22 @@ if (-not (Test-Path $starshipConfig)) {
     return
 }
 
-if (Get-Command starship -ErrorAction SilentlyContinue) {
+$starshipCommand = Get-Command starship -ErrorAction SilentlyContinue
+if (-not $starshipCommand -and (Get-Command mise -ErrorAction SilentlyContinue)) {
+    $starshipPath = mise which starship 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($starshipPath) -and (Test-Path $starshipPath.Trim())) {
+        $starshipCommand = [pscustomobject]@{ Source = $starshipPath.Trim() }
+    }
+}
+
+if ($starshipCommand) {
+    $cacheRoot = Join-Path $HOME ".cache\windots"
+    $cachePath = Join-Path $cacheRoot "starship-init.ps1"
+    if (-not (Test-Path $cacheRoot)) { New-Item -ItemType Directory -Path $cacheRoot -Force | Out-Null }
+
+    & $starshipCommand.Source init powershell --print-full-init | Set-Content -Path $cachePath -Encoding UTF8
     Log-Info "Starship ready: $starshipConfig"
+    Log-Info "Starship init cache: $cachePath"
 }
 else {
     Log-Warn "Starship is not in PATH yet. It is installed by mise when enabled."
