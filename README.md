@@ -101,11 +101,11 @@ Keep personal Git aliases/scripts in `~/.gitconfig.local`; the managed `.gitconf
 
 ```powershell
 zellij --layout dev
-zellij --layout opencode-terminal
-zellij --layout terminal-grid
+zellij --layout oc
+zellij --layout grid
 ```
 
-The Zellij config sets `pwsh` as the default shell. `opencode-terminal` opens OpenCode next to two PowerShell panes.
+The Zellij config sets `pwsh` as the default shell. `oc` opens OpenCode next to two PowerShell panes.
 
 ## What Gets Managed
 

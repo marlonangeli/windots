@@ -6,18 +6,11 @@ layout {
         children
     }
 
-    tab name="terminals" {
+    tab name="oc" {
         pane split_direction="horizontal" {
+            pane size="70%" command="opencode"
             pane command="pwsh" {
                 args "-NoLogo"
-            }
-            pane split_direction="vertical" {
-                pane command="pwsh" {
-                    args "-NoLogo"
-                }
-                pane command="pwsh" {
-                    args "-NoLogo"
-                }
             }
         }
     }

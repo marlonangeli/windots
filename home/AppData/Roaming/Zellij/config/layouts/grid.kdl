@@ -6,10 +6,12 @@ layout {
         children
     }
 
-    tab name="ai" {
-        pane split_direction="vertical" {
-            pane size="58%" command="opencode"
-            pane split_direction="horizontal" {
+    tab name="grid" {
+        pane split_direction="horizontal" {
+            pane command="pwsh" {
+                args "-NoLogo"
+            }
+            pane split_direction="vertical" {
                 pane command="pwsh" {
                     args "-NoLogo"
                 }

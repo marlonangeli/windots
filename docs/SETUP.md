@@ -122,11 +122,11 @@ ilegna config restore latest --items ssh
 
 ```powershell
 zellij --layout dev
-zellij --layout opencode-terminal
-zellij --layout terminal-grid
+zellij --layout oc
+zellij --layout grid
 ```
 
-The layouts use `pwsh`; `opencode-terminal` opens OpenCode next to terminal panes.
+The layouts use `pwsh`; `oc` opens OpenCode next to terminal panes.
 
 ## Validation
 
