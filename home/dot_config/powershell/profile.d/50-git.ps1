@@ -26,3 +26,23 @@ function gsync {
     if ($LASTEXITCODE -ne 0) { return }
     git pull --ff-only origin $Branch
 }
+
+$global:__WindotsWorktrunkLoaded = $false
+function Enable-Worktrunk {
+    [CmdletBinding()]
+    param()
+
+    if ($global:__WindotsWorktrunkLoaded) { return $true }
+    if (-not (Get-Command git-wt -ErrorAction SilentlyContinue)) { return $false }
+
+    if (Invoke-ShellInitScript -Command "git-wt" -Arguments @("config", "shell", "init", "powershell")) {
+        $global:__WindotsWorktrunkLoaded = $true
+        return $true
+    }
+
+    return $false
+}
+
+if ($env:WINDOTS_WORKTRUNK -eq "1") {
+    Enable-Worktrunk | Out-Null
+}

@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "autoupdate": true,
   "instructions": [
     "AGENTS.md",
     "~/.config/ai/AGENTS.md"
@@ -15,7 +16,7 @@
     },
     "filesystem": {
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", {{ .chezmoi.homeDir | quote }}],
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", {{ .chezmoi.homeDir | quote }}, "C:/git"],
       "enabled": true
     }
   }
