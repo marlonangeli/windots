@@ -31,6 +31,9 @@ if ([string]::IsNullOrWhiteSpace($env:CHEZMOI_EMAIL)) {
     }
 }
 
+chezmoi init --source $repoRoot --no-tty
+if ($LASTEXITCODE -ne 0) { throw "chezmoi init failed with exit code $LASTEXITCODE" }
+
 if ($Apply) {
     $chezmoiArgs = @("--source", $repoRoot, "apply")
     if ($Force) { $chezmoiArgs += "--force" }
