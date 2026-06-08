@@ -50,6 +50,8 @@ pwsh ./scripts/doctor.ps1
 
 ```powershell
 ilegna wt new feat/fun-cli --base main
+ilegna wt new -i
+ilegna wt new fix/courier --base main
 ilegna wt list
 ilegna git-bare sync main
 ilegna git-bare sync --all --tags

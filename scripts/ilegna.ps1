@@ -6,6 +6,9 @@ param(
     [Parameter(Position = 1)]
     [string]$Command,
 
+    [Alias("i")]
+    [switch]$Interactive,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$CliArgs
 )
@@ -40,6 +43,7 @@ Resources:
 
 Examples:
   ilegna wt new feat/fun-cli --base main
+  ilegna wt new -i
   ilegna wt open feat/fun-cli
   ilegna git-bare sync main
   ilegna git-bare sync --all --tags
@@ -67,6 +71,21 @@ function Split-IlegnaArgs {
         $item = $item.ToString()
         if ($item.StartsWith("--")) {
             $name = $item.Substring(2)
+            if ([string]::IsNullOrWhiteSpace($name)) { continue }
+
+            $next = if ($i + 1 -lt $inputList.Count) { $inputList[$i + 1].ToString() } else { $null }
+            if ($next -and -not $next.StartsWith("-")) {
+                $options[$name] = $next
+                $i++
+            }
+            else {
+                $null = $flags.Add($name)
+            }
+            continue
+        }
+
+        if ($item.StartsWith("-") -and $item.Length -gt 1) {
+            $name = $item.Substring(1)
             if ([string]::IsNullOrWhiteSpace($name)) { continue }
 
             $next = if ($i + 1 -lt $inputList.Count) { $inputList[$i + 1].ToString() } else { $null }
@@ -123,10 +142,13 @@ function Assert-GitRepository {
     [CmdletBinding()]
     param()
 
-    git rev-parse --is-inside-work-tree *> $null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Not inside a git repository."
-    }
+    $inside = git rev-parse --is-inside-work-tree 2>$null
+    if ($LASTEXITCODE -eq 0 -and $inside -and $inside.Trim() -eq "true") { return }
+
+    $bare = git rev-parse --is-bare-repository 2>$null
+    if ($LASTEXITCODE -eq 0 -and $bare -and $bare.Trim() -eq "true") { return }
+
+    throw "Not inside a git repository."
 }
 
 function Get-GitRoot {
@@ -136,6 +158,8 @@ function Get-GitRoot {
     Assert-GitRepository
     $root = git rev-parse --show-toplevel 2>$null
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($root)) {
+        $bareRoot = Get-GitBareRepositoryPathOrNull
+        if (-not [string]::IsNullOrWhiteSpace($bareRoot)) { return $bareRoot }
         throw "Unable to resolve git root."
     }
 
@@ -229,6 +253,18 @@ function Resolve-GitBareRepositoryPath {
     }
 
     throw "Unable to resolve a bare repository. Run from a bare-backed worktree or pass --path <bare-repo>."
+}
+
+function Get-GitBareRepositoryPathOrNull {
+    [CmdletBinding()]
+    param()
+
+    try {
+        return Resolve-GitBareRepositoryPath
+    }
+    catch {
+        return $null
+    }
 }
 
 function Get-GitBareDefaultBranch {
@@ -561,13 +597,82 @@ function Get-WorktreePathByBranch {
     return $null
 }
 
-function Get-DefaultWorktreePath {
+function Convert-BranchToWorktreeName {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Branch)
 
-    $root = Get-GitRoot
-    $safeBranch = $Branch -replace '[^A-Za-z0-9._-]', '-'
-    return (Join-Path (Join-Path $root ".worktrees") $safeBranch)
+    return ($Branch -replace '[^A-Za-z0-9._-]', '-')
+}
+
+function Get-DefaultWorktreeParent {
+    [CmdletBinding()]
+    param()
+
+    $bareRoot = Get-GitBareRepositoryPathOrNull
+    if (-not [string]::IsNullOrWhiteSpace($bareRoot)) { return $bareRoot }
+
+    return (Join-Path (Get-GitRoot) ".worktrees")
+}
+
+function Get-DefaultWorktreePath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Branch,
+        [switch]$CurrentDirectory
+    )
+
+    $parent = if ($CurrentDirectory) { (Get-Location).ProviderPath } else { Get-DefaultWorktreeParent }
+    return (Join-Path $parent (Convert-BranchToWorktreeName -Branch $Branch))
+}
+
+function Resolve-WorktreePathInput {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Path)
+
+    $expanded = $ExecutionContext.InvokeCommand.ExpandString($Path)
+    if ([System.IO.Path]::IsPathRooted($expanded)) { return $expanded }
+
+    return (Join-Path (Get-Location).ProviderPath $expanded)
+}
+
+function Read-IlegnaPrompt {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Prompt,
+        [string]$Default
+    )
+
+    $label = if ([string]::IsNullOrWhiteSpace($Default)) { $Prompt } else { "$Prompt [$Default]" }
+    $value = Read-Host $label
+    if ([string]::IsNullOrWhiteSpace($value)) { return $Default }
+    return $value.Trim()
+}
+
+function Read-IlegnaYesNo {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Prompt,
+        [bool]$Default = $true
+    )
+
+    $suffix = if ($Default) { "Y/n" } else { "y/N" }
+    $value = Read-Host "$Prompt [$suffix]"
+    if ([string]::IsNullOrWhiteSpace($value)) { return $Default }
+
+    return ($value.Trim().ToLowerInvariant() -in @("y", "yes", "s", "sim"))
+}
+
+function Resolve-WorktreeBaseRef {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Base)
+
+    git fetch origin $Base *> $null
+    if ($LASTEXITCODE -eq 0) { return "FETCH_HEAD" }
+
+    git rev-parse --verify "$Base^{commit}" *> $null
+    if ($LASTEXITCODE -eq 0) { return $Base }
+
+    throw "Unable to resolve base ref: $Base"
 }
 
 function Invoke-IlegnaWorktree {
@@ -587,15 +692,34 @@ function Invoke-IlegnaWorktree {
         }
         "new" {
             Assert-GitRepository
+            $interactive = Test-IlegnaFlag -Parsed $parsed -Names @("interactive", "i")
             $branch = $parsed.Positionals | Select-Object -First 1
-            if ([string]::IsNullOrWhiteSpace($branch)) { throw "Usage: ilegna wt new <branch> [--base main] [--path .worktrees/name] [--cd]" }
+
+            if ($interactive -and [string]::IsNullOrWhiteSpace($branch)) {
+                $branch = Read-IlegnaPrompt -Prompt "Branch"
+            }
+
+            if ([string]::IsNullOrWhiteSpace($branch)) { throw "Usage: ilegna wt new <branch> [--base main] [--path .worktrees/name] [--cd] or ilegna wt new -i" }
 
             git check-ref-format --branch $branch *> $null
             if ($LASTEXITCODE -ne 0) { throw "Invalid branch name: $branch" }
 
-            $base = Get-IlegnaOption -Parsed $parsed -Names @("base") -Default (Get-DefaultBranch)
-            $path = Get-IlegnaOption -Parsed $parsed -Names @("path") -Default (Get-DefaultWorktreePath -Branch $branch)
+            $base = Get-IlegnaOption -Parsed $parsed -Names @("base", "b") -Default (Get-DefaultBranch)
+            $path = Get-IlegnaOption -Parsed $parsed -Names @("path", "location", "name")
             $cdAfter = Test-IlegnaFlag -Parsed $parsed -Names @("cd", "open")
+
+            if ($interactive) {
+                $base = Read-IlegnaPrompt -Prompt "Base" -Default $base
+                $defaultPath = Get-DefaultWorktreePath -Branch $branch -CurrentDirectory
+                $path = Read-IlegnaPrompt -Prompt "Location/Name" -Default $defaultPath
+                $cdAfter = Read-IlegnaYesNo -Prompt "Move to worktree directory" -Default $true
+            }
+
+            if ([string]::IsNullOrWhiteSpace($path)) {
+                $path = Get-DefaultWorktreePath -Branch $branch
+            }
+
+            $path = Resolve-WorktreePathInput -Path $path
 
             $parent = Split-Path -Parent $path
             if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path $parent)) {
@@ -605,8 +729,7 @@ function Invoke-IlegnaWorktree {
             if (Test-Path $path) { throw "Worktree path already exists: $path" }
 
             Write-IlegnaLine "Creating worktree '$branch' from '$base'" Cyan
-            git fetch origin $base *> $null
-            $baseRef = if ($LASTEXITCODE -eq 0) { "origin/$base" } else { $base }
+            $baseRef = Resolve-WorktreeBaseRef -Base $base
 
             git worktree add $path -b $branch $baseRef
             if ($LASTEXITCODE -ne 0) { throw "git worktree add failed." }
@@ -945,6 +1068,10 @@ function Invoke-IlegnaConfig {
 }
 
 try {
+    if ($Interactive) {
+        $CliArgs = @("-i") + @($CliArgs)
+    }
+
     if ([string]::IsNullOrWhiteSpace($Resource) -or $Resource -in @("help", "-h", "--help")) {
         Show-IlegnaHelp
         return

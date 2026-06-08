@@ -29,4 +29,12 @@ Describe "ilegna command surface" {
         $content | Should Match '\+refs/heads/\$\{branch\}:refs/heads/\$\{branch\}'
         $content | Should Match '\+refs/tags/\*:refs/tags/\*'
     }
+
+    It "supports interactive and bare-backed worktree creation" {
+        $content | Should Match 'Read-IlegnaPrompt'
+        $content | Should Match 'Read-IlegnaYesNo'
+        $content | Should Match 'Get-DefaultWorktreeParent'
+        $content | Should Match 'Resolve-WorktreeBaseRef'
+        $content | Should Match 'FETCH_HEAD'
+    }
 }

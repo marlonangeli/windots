@@ -92,6 +92,8 @@ pwsh ./scripts/windots.ps1 -Command validate
 
 ```powershell
 ilegna wt new feat/example --base main
+ilegna wt new -i
+ilegna wt new fix/courier --base main
 ilegna pr new --base develop
 ilegna pipeline list
 ilegna jira start ABC-123 "small task"
