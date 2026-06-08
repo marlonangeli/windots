@@ -3,6 +3,11 @@
 {{- $github := env "CHEZMOI_GITHUB_USERNAME" -}}
 {{- $azureOrg := env "CHEZMOI_AZURE_ORG" -}}
 {{- $azureProject := env "CHEZMOI_AZURE_PROJECT" -}}
+{{- $sourceDir := env "WINDOTS_REPO_ROOT" -}}
+{{- if $sourceDir }}
+sourceDir = {{ $sourceDir | quote }}
+
+{{- end }}
 [data]
 name = {{ $name | quote }}
 email = {{ $email | quote }}
@@ -11,5 +16,5 @@ repo_name = "windots"
 azure_org = {{ $azureOrg | quote }}
 azure_project = {{ $azureProject | quote }}
 editor = "zed"
-terminal_font = "JetBrainsMono Nerd Font Mono"
+terminal_font = "JetBrainsMono NFM"
 terminal_scheme = "Catppuccin Mocha"

@@ -15,10 +15,18 @@ Describe "ilegna command surface" {
 
     It "dispatches expected resources" {
         $content | Should Match '"wt"'
+        $content | Should Match '"git-bare"'
         $content | Should Match '"pr"'
         $content | Should Match '"pipeline"'
         $content | Should Match '"jira"'
         $content | Should Match '"config"'
         $content | Should Match '"doctor"'
+    }
+
+    It "supports bare repo sync refspecs" {
+        $content | Should Match 'Invoke-IlegnaGitBare'
+        $content | Should Match 'Sync-GitBareBranch'
+        $content | Should Match '\+refs/heads/\$\{branch\}:refs/heads/\$\{branch\}'
+        $content | Should Match '\+refs/tags/\*:refs/tags/\*'
     }
 }
