@@ -51,6 +51,9 @@ pwsh ./scripts/doctor.ps1
 ```powershell
 ilegna wt new feat/fun-cli --base main
 ilegna wt list
+ilegna git-bare sync main
+ilegna git-bare sync --all --tags
+ilegna git-bare status --all
 ilegna pr new --base develop --draft
 ilegna pipeline list
 ilegna jira start ABC-123 "small task"

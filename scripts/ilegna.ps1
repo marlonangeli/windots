@@ -31,6 +31,7 @@ ilegna <resource> <command> [args]
 
 Resources:
   wt          git worktrees: list, new, remove, open, status, prune
+  git-bare    bare repos: sync, status, refs, path
   pr          pull requests: new, list, view, checkout
   pipeline    CI runs: list, watch, open
   jira        Jira helpers: me, mine, start, show, stop
@@ -40,6 +41,8 @@ Resources:
 Examples:
   ilegna wt new feat/fun-cli --base main
   ilegna wt open feat/fun-cli
+  ilegna git-bare sync main
+  ilegna git-bare sync --all --tags
   ilegna pr new --base develop --draft
   ilegna pipeline list
   ilegna jira start ABC-123 "implement CLI"
@@ -176,6 +179,363 @@ function Get-RepositoryHost {
     if ($remote -match 'dev\.azure\.com|\.visualstudio\.com|azuredevops') { return "azure" }
     if ($remote -match 'github\.com[:/]') { return "github" }
     return "unknown"
+}
+
+function Test-GitBareRepositoryPath {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Path)
+
+    $isBare = git --git-dir $Path config --bool core.bare 2>$null
+    return ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($isBare) -and $isBare.Trim() -eq "true")
+}
+
+function Resolve-GitBareRepositoryPath {
+    [CmdletBinding()]
+    param([string]$Path)
+
+    if (-not [string]::IsNullOrWhiteSpace($Path)) {
+        $resolved = Resolve-Path -LiteralPath $Path -ErrorAction SilentlyContinue
+        if (-not $resolved) { throw "Bare repo path not found: $Path" }
+
+        $candidate = $resolved.ProviderPath
+        if (-not (Test-GitBareRepositoryPath -Path $candidate)) { throw "Path is not a bare git repository: $candidate" }
+        return $candidate
+    }
+
+    $isCurrentBare = git rev-parse --is-bare-repository 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($isCurrentBare) -and $isCurrentBare.Trim() -eq "true") {
+        $gitDir = git rev-parse --git-dir 2>$null
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($gitDir)) {
+            $candidate = $gitDir.Trim()
+            $resolved = Resolve-Path -LiteralPath $candidate -ErrorAction SilentlyContinue
+            if ($resolved) { $candidate = $resolved.ProviderPath }
+            if (Test-GitBareRepositoryPath -Path $candidate) { return $candidate }
+        }
+    }
+
+    $commonDir = git rev-parse --git-common-dir 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($commonDir)) {
+        $candidate = $commonDir.Trim()
+        $resolved = Resolve-Path -LiteralPath $candidate -ErrorAction SilentlyContinue
+        if (-not $resolved -and -not [System.IO.Path]::IsPathRooted($candidate)) {
+            $root = git rev-parse --show-toplevel 2>$null
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($root)) {
+                $resolved = Resolve-Path -LiteralPath (Join-Path $root.Trim() $candidate) -ErrorAction SilentlyContinue
+            }
+        }
+
+        if ($resolved) { $candidate = $resolved.ProviderPath }
+        if (Test-GitBareRepositoryPath -Path $candidate) { return $candidate }
+    }
+
+    throw "Unable to resolve a bare repository. Run from a bare-backed worktree or pass --path <bare-repo>."
+}
+
+function Get-GitBareDefaultBranch {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepoPath,
+        [Parameter(Mandatory)][string]$Remote
+    )
+
+    $remoteHead = git --git-dir $RepoPath ls-remote --symref $Remote HEAD 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        foreach ($line in @($remoteHead)) {
+            if ($line -match '^ref:\s+refs/heads/(.+)\s+HEAD$') { return $Matches[1] }
+        }
+    }
+
+    $localHead = git --git-dir $RepoPath symbolic-ref --short HEAD 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($localHead)) { return $localHead.Trim() }
+
+    return "main"
+}
+
+function Get-GitBareSelectedBranch {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$Parsed,
+        [Parameter(Mandatory)][string]$RepoPath,
+        [Parameter(Mandatory)][string]$Remote
+    )
+
+    $branch = Get-IlegnaOption -Parsed $Parsed -Names @("branch", "b")
+    if ([string]::IsNullOrWhiteSpace($branch)) {
+        $branch = @($Parsed.Positionals | Where-Object { $_ -ne "all" } | Select-Object -First 1) | Select-Object -First 1
+    }
+
+    if ([string]::IsNullOrWhiteSpace($branch)) { $branch = Get-GitBareDefaultBranch -RepoPath $RepoPath -Remote $Remote }
+    if ([string]::IsNullOrWhiteSpace($branch)) { throw "Unable to resolve branch. Pass <branch> or --branch <name>." }
+
+    return $branch
+}
+
+function Get-GitBareRemoteHeads {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepoPath,
+        [Parameter(Mandatory)][string]$Remote
+    )
+
+    $lines = git --git-dir $RepoPath ls-remote --heads $Remote 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "Unable to query remote heads from '$Remote'." }
+
+    $heads = foreach ($line in @($lines)) {
+        if ($line -match '^([0-9a-fA-F]+)\s+refs/heads/(.+)$') {
+            [pscustomobject]@{
+                Branch = $Matches[2]
+                Sha = $Matches[1]
+            }
+        }
+    }
+
+    return @($heads)
+}
+
+function Get-GitBareRemoteBranchSha {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepoPath,
+        [Parameter(Mandatory)][string]$Remote,
+        [Parameter(Mandatory)][string]$Branch
+    )
+
+    $escapedBranch = [regex]::Escape($Branch)
+    $lines = git --git-dir $RepoPath ls-remote --heads $Remote $Branch 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "Unable to query remote branch '$Branch' from '$Remote'." }
+
+    foreach ($line in @($lines)) {
+        if ($line -match "^([0-9a-fA-F]+)\s+refs/heads/$escapedBranch$") { return $Matches[1] }
+    }
+
+    return $null
+}
+
+function Get-GitBareLocalBranchSha {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepoPath,
+        [Parameter(Mandatory)][string]$Branch
+    )
+
+    $sha = git --git-dir $RepoPath rev-parse --verify "refs/heads/$Branch" 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sha)) { return $null }
+
+    return $sha.Trim()
+}
+
+function Write-GitBareBranchStatus {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepoPath,
+        [Parameter(Mandatory)][string]$Remote,
+        [Parameter(Mandatory)][string]$Branch,
+        [string]$RemoteSha
+    )
+
+    $localSha = Get-GitBareLocalBranchSha -RepoPath $RepoPath -Branch $Branch
+    if ([string]::IsNullOrWhiteSpace($RemoteSha)) {
+        $RemoteSha = Get-GitBareRemoteBranchSha -RepoPath $RepoPath -Remote $Remote -Branch $Branch
+    }
+
+    $state = if ([string]::IsNullOrWhiteSpace($RemoteSha)) {
+        "missing-remote"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($localSha)) {
+        "missing-local"
+    }
+    elseif ($localSha -eq $RemoteSha) {
+        "up-to-date"
+    }
+    else {
+        "stale"
+    }
+
+    $color = if ($state -eq "up-to-date") { [ConsoleColor]::Green } elseif ($state -eq "stale") { [ConsoleColor]::Yellow } else { [ConsoleColor]::Red }
+    $localText = if ([string]::IsNullOrWhiteSpace($localSha)) { "<missing>" } else { $localSha }
+    $remoteText = if ([string]::IsNullOrWhiteSpace($RemoteSha)) { "<missing>" } else { $RemoteSha }
+    Write-IlegnaLine ("{0} local={1} remote={2} {3}" -f $Branch, $localText, $remoteText, $state) $color
+}
+
+function Get-GitBareWorktreeBranches {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$RepoPath)
+
+    $branches = New-Object 'System.Collections.Generic.Dictionary[string,string]'
+    $currentPath = $null
+    foreach ($line in git --git-dir $RepoPath worktree list --porcelain) {
+        if ($line -match '^worktree\s+(.+)$') {
+            $currentPath = $Matches[1]
+            continue
+        }
+
+        if ($line -match '^branch\s+refs/heads/(.+)$' -and -not [string]::IsNullOrWhiteSpace($currentPath)) {
+            $branches[$Matches[1]] = $currentPath
+        }
+    }
+
+    return $branches
+}
+
+function Get-GitBareLocalBranches {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$RepoPath)
+
+    $branches = git --git-dir $RepoPath for-each-ref --format="%(refname:short)" refs/heads 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "Unable to list local branches in '$RepoPath'." }
+
+    return @($branches | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
+
+function Sync-GitBareBranch {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepoPath,
+        [Parameter(Mandatory)][string]$Remote,
+        [Parameter(Mandatory)][string]$Branch,
+        [string]$WorktreePath,
+        [switch]$DryRun
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($WorktreePath)) {
+        Write-IlegnaLine "Syncing checked-out branch '$Branch' via worktree '$WorktreePath'" Cyan
+        $worktreeArgs = if ($DryRun) {
+            @("-C", $WorktreePath, "fetch", "--dry-run", $Remote, $Branch)
+        }
+        else {
+            @("-C", $WorktreePath, "pull", "--ff-only", $Remote, $Branch)
+        }
+
+        git @worktreeArgs
+        if ($LASTEXITCODE -ne 0) { throw "git worktree sync failed for '$Branch'." }
+        return
+    }
+
+    $refspec = "+refs/heads/${Branch}:refs/heads/${Branch}"
+    $fetchArgs = @("--git-dir", $RepoPath, "fetch", "--prune")
+    if ($DryRun) { $fetchArgs += "--dry-run" }
+    $fetchArgs += $Remote
+    $fetchArgs += $refspec
+
+    Write-IlegnaLine "Syncing bare branch '$Branch'" Cyan
+    git @fetchArgs
+    if ($LASTEXITCODE -ne 0) { throw "git fetch failed for '$Branch'." }
+}
+
+function Sync-GitBareTags {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepoPath,
+        [Parameter(Mandatory)][string]$Remote,
+        [switch]$DryRun
+    )
+
+    $fetchArgs = @("--git-dir", $RepoPath, "fetch", "--prune", "--prune-tags")
+    if ($DryRun) { $fetchArgs += "--dry-run" }
+    $fetchArgs += $Remote
+    $fetchArgs += "+refs/tags/*:refs/tags/*"
+
+    Write-IlegnaLine "Syncing bare tags" Cyan
+    git @fetchArgs
+    if ($LASTEXITCODE -ne 0) { throw "git tag fetch failed." }
+}
+
+function Remove-GitBareDeletedBranches {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$RepoPath,
+        [Parameter(Mandatory)][object[]]$RemoteHeads,
+        [Parameter(Mandatory)][object]$WorktreeBranches,
+        [switch]$DryRun
+    )
+
+    $remoteBranchSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    foreach ($head in $RemoteHeads) { $remoteBranchSet.Add($head.Branch) | Out-Null }
+
+    foreach ($branch in Get-GitBareLocalBranches -RepoPath $RepoPath) {
+        if ($remoteBranchSet.Contains($branch)) { continue }
+
+        if ($WorktreeBranches.ContainsKey($branch)) {
+            Write-IlegnaLine "Skipping prune for checked-out branch '$branch' at '$($WorktreeBranches[$branch])'" Yellow
+            continue
+        }
+
+        $message = if ($DryRun) { "Would prune local branch '$branch'" } else { "Pruning local branch '$branch'" }
+        Write-IlegnaLine $message Yellow
+        if ($DryRun) { continue }
+
+        git --git-dir $RepoPath update-ref -d "refs/heads/$branch"
+        if ($LASTEXITCODE -ne 0) { throw "Unable to prune local branch '$branch'." }
+    }
+}
+
+function Invoke-IlegnaGitBare {
+    [CmdletBinding()]
+    param(
+        [string]$Subcommand,
+        [string[]]$InputArgs
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Subcommand)) { $Subcommand = "status" }
+    $parsed = Split-IlegnaArgs -InputArgs $InputArgs
+    $repoPath = Resolve-GitBareRepositoryPath -Path (Get-IlegnaOption -Parsed $parsed -Names @("path", "repo", "git-dir", "bare"))
+    $remote = Get-IlegnaOption -Parsed $parsed -Names @("remote", "r") -Default "origin"
+    $all = (Test-IlegnaFlag -Parsed $parsed -Names @("all")) -or (@($parsed.Positionals | Select-Object -First 1) -eq "all")
+
+    switch ($Subcommand.ToLowerInvariant()) {
+        "path" {
+            Write-IlegnaLine $repoPath Cyan
+        }
+        { $_ -in @("sync", "fetch", "update") } {
+            $syncTags = Test-IlegnaFlag -Parsed $parsed -Names @("tags")
+            $dryRun = Test-IlegnaFlag -Parsed $parsed -Names @("dry-run", "no-op")
+            $worktreeBranches = Get-GitBareWorktreeBranches -RepoPath $repoPath
+
+            if ($all) {
+                Write-IlegnaLine "Syncing bare repo '$repoPath' from '$remote' (all branches)" Cyan
+                $heads = Get-GitBareRemoteHeads -RepoPath $repoPath -Remote $remote
+                foreach ($head in @($heads | Sort-Object Branch)) {
+                    $worktreePath = if ($worktreeBranches.ContainsKey($head.Branch)) { $worktreeBranches[$head.Branch] } else { $null }
+                    Sync-GitBareBranch -RepoPath $repoPath -Remote $remote -Branch $head.Branch -WorktreePath $worktreePath -DryRun:$dryRun
+                }
+
+                Remove-GitBareDeletedBranches -RepoPath $repoPath -RemoteHeads $heads -WorktreeBranches $worktreeBranches -DryRun:$dryRun
+            }
+            else {
+                $branch = Get-GitBareSelectedBranch -Parsed $parsed -RepoPath $repoPath -Remote $remote
+                $worktreePath = if ($worktreeBranches.ContainsKey($branch)) { $worktreeBranches[$branch] } else { $null }
+                Write-IlegnaLine "Syncing bare repo '$repoPath' from '$remote' (branch '$branch')" Cyan
+                Sync-GitBareBranch -RepoPath $repoPath -Remote $remote -Branch $branch -WorktreePath $worktreePath -DryRun:$dryRun
+            }
+
+            if ($syncTags) { Sync-GitBareTags -RepoPath $repoPath -Remote $remote -DryRun:$dryRun }
+
+            if ($dryRun) { Write-IlegnaLine "Dry-run complete." Yellow; return }
+            Write-IlegnaLine "Bare repo refs synced." Green
+        }
+        { $_ -in @("status", "verify", "check") } {
+            Write-IlegnaLine "repo=$repoPath" Cyan
+            Write-IlegnaLine "remote=$remote" Cyan
+
+            if ($all) {
+                $heads = Get-GitBareRemoteHeads -RepoPath $repoPath -Remote $remote
+                if (-not $heads) { Write-IlegnaLine "No remote heads found." Yellow; return }
+                foreach ($head in @($heads | Sort-Object Branch)) {
+                    Write-GitBareBranchStatus -RepoPath $repoPath -Remote $remote -Branch $head.Branch -RemoteSha $head.Sha
+                }
+                return
+            }
+
+            $branch = Get-GitBareSelectedBranch -Parsed $parsed -RepoPath $repoPath -Remote $remote
+            Write-GitBareBranchStatus -RepoPath $repoPath -Remote $remote -Branch $branch
+        }
+        { $_ -in @("refs", "list") } {
+            git --git-dir $repoPath for-each-ref --sort=refname --format="%(refname:short) %(objectname:short) %(committerdate:relative)" refs/heads
+        }
+        default {
+            throw "Unknown git-bare command: $Subcommand"
+        }
+    }
 }
 
 function Get-WorktreePathByBranch {
@@ -592,6 +952,7 @@ try {
 
     switch ($Resource.ToLowerInvariant()) {
         { $_ -in @("wt", "worktree", "worktrees") } { Invoke-IlegnaWorktree -Subcommand $Command -InputArgs $CliArgs; break }
+        { $_ -in @("git-bare", "bare") } { Invoke-IlegnaGitBare -Subcommand $Command -InputArgs $CliArgs; break }
         { $_ -in @("pr", "pull-request", "pull-requests") } { Invoke-IlegnaPullRequest -Subcommand $Command -InputArgs $CliArgs; break }
         { $_ -in @("pipeline", "pipelines", "ci") } { Invoke-IlegnaPipeline -Subcommand $Command -InputArgs $CliArgs; break }
         "jira" { Invoke-IlegnaJira -Subcommand $Command -InputArgs $CliArgs; break }
