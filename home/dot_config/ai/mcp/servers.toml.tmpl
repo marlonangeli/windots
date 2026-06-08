@@ -6,3 +6,11 @@ source = "windots"
 root = "~/.config/ai"
 mcp = "~/.config/ai/mcp"
 skills = "~/.config/ai/skills"
+
+[servers.git]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-git"]
+
+[servers.filesystem]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-filesystem", {{ .chezmoi.homeDir | quote }}]

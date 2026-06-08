@@ -10,6 +10,14 @@ run = "pwsh -NoProfile -File ./scripts/bootstrap.ps1 -Mode full"
 description = "Run repository validation"
 run = "pwsh -NoProfile -File ./scripts/validate.ps1"
 
+[tasks.doctor]
+description = "Check local windots tools"
+run = "pwsh -NoProfile -File ./scripts/doctor.ps1"
+
+[tasks.ilegna]
+description = "Run the ilegna workflow CLI"
+run = "pwsh -NoProfile -File ./scripts/ilegna.ps1"
+
 [tasks.validate-modules]
 description = "Run module registry validation"
 run = "pwsh -NoProfile -File ./scripts/validate-modules.ps1"

@@ -71,8 +71,6 @@ function Invoke-WindotsModuleShell {
         Ensure-WindotsModulePackages -Module "shell" -Mode $mode -WhatIf:$Context.WhatIf
 
         Ensure-WindotsPowerShellModule -Name "PSReadLine" -WhatIf:$Context.WhatIf -NoPrompt:$Context.NoPrompt -Required
-        Ensure-WindotsPowerShellModule -Name "Terminal-Icons" -WhatIf:$Context.WhatIf -NoPrompt:$Context.NoPrompt
-        Ensure-WindotsPowerShellModule -Name "posh-git" -WhatIf:$Context.WhatIf -NoPrompt:$Context.NoPrompt
     }
 
     $scriptPath = Join-Path $PSScriptRoot "profile-shim.ps1"

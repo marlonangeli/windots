@@ -1,5 +1,5 @@
 @{
-    Version = '1.0.0'
+    Version = '1.1.0'
     Providers = @('winget', 'mise')
     Packages = @(
         @{
@@ -33,37 +33,10 @@
             Name = 'windows-terminal'
             Provider = 'winget'
             PackageId = 'Microsoft.WindowsTerminal'
-            VerifyPath = '$env:LOCALAPPDATA\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe'
+            VerifyPath = '$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe'
             Modules = @('terminal')
             Modes = @('full', 'clean')
             Required = $true
-        },
-        @{
-            Name = 'github-cli'
-            Provider = 'winget'
-            PackageId = 'GitHub.cli'
-            VerifyCommand = 'gh'
-            Modules = @('core')
-            Modes = @('full', 'clean')
-            Required = $false
-        },
-        @{
-            Name = 'oh-my-posh'
-            Provider = 'winget'
-            PackageId = 'JanDeDobbeleer.OhMyPosh'
-            VerifyCommand = 'oh-my-posh'
-            Modules = @('shell', 'themes')
-            Modes = @('full', 'clean')
-            Required = $true
-        },
-        @{
-            Name = 'jetbrainsmono-nerdfont'
-            Provider = 'winget'
-            PackageId = 'DEVCOM.JetBrainsMonoNerdFont'
-            VerifyPath = '$env:WINDIR\\Fonts\\JetBrainsMonoNerdFont-Regular.ttf'
-            Modules = @('themes')
-            Modes = @('full', 'clean')
-            Required = $false
         },
         @{
             Name = 'mise'
@@ -84,21 +57,12 @@
             Required = $true
         },
         @{
-            Name = 'azure-cli'
+            Name = 'jetbrainsmono-nerdfont'
             Provider = 'winget'
-            PackageId = 'Microsoft.AzureCLI'
-            VerifyCommand = 'az'
-            Modules = @('packages')
-            Modes = @('full')
-            Required = $false
-        },
-        @{
-            Name = 'docker-desktop'
-            Provider = 'winget'
-            PackageId = 'Docker.DockerDesktop'
-            VerifyPath = '$env:ProgramFiles\\Docker\\Docker\\Docker Desktop.exe'
-            Modules = @('packages')
-            Modes = @('full')
+            PackageId = 'DEVCOM.JetBrainsMonoNerdFont'
+            VerifyPath = '$env:WINDIR\Fonts\JetBrainsMonoNerdFont-Regular.ttf'
+            Modules = @('themes')
+            Modes = @('full', 'clean')
             Required = $false
         },
         @{
@@ -114,17 +78,26 @@
             Name = 'zed'
             Provider = 'winget'
             PackageId = 'ZedIndustries.Zed'
-            VerifyPath = '$env:LOCALAPPDATA\\Programs\\Zed\\Zed.exe'
+            VerifyPath = '$env:LOCALAPPDATA\Programs\Zed\Zed.exe'
             Modules = @('packages')
             Modes = @('full')
             Required = $false
         },
         @{
-            Name = 'github-copilot'
+            Name = 'docker-desktop'
             Provider = 'winget'
-            PackageId = 'GitHub.Copilot'
-            VerifyPath = '$env:LOCALAPPDATA\\Programs\\GitHub Copilot'
-            Modules = @('ai')
+            PackageId = 'Docker.DockerDesktop'
+            VerifyPath = '$env:ProgramFiles\Docker\Docker\Docker Desktop.exe'
+            Modules = @('packages')
+            Modes = @('full')
+            Required = $false
+        },
+        @{
+            Name = 'azure-cli'
+            Provider = 'winget'
+            PackageId = 'Microsoft.AzureCLI'
+            VerifyCommand = 'az'
+            Modules = @('packages')
             Modes = @('full')
             Required = $false
         },
@@ -138,34 +111,16 @@
             Required = $false
         },
         @{
-            Name = 'fzf'
-            Provider = 'winget'
-            PackageId = 'junegunn.fzf'
-            VerifyCommand = 'fzf'
-            Modules = @('packages')
-            Modes = @('full', 'clean')
-            Required = $false
-        },
-        @{
             Name = 'visual-studio-build-tools'
             Provider = 'winget'
             PackageId = 'Microsoft.VisualStudio.2022.BuildTools'
-            VerifyPath = '${env:ProgramFiles(x86)}\\Microsoft Visual Studio\\2022\\BuildTools'
+            VerifyPath = '${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools'
             ExtraArgs = @(
                 '--override'
                 '--quiet --wait --norestart --nocache --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --includeRecommended --includeOptional'
             )
             Modules = @('development')
             Modes = @('full')
-            Required = $false
-        },
-        @{
-            Name = 'mise-tool-dotnet'
-            Provider = 'mise'
-            PackageId = 'dotnet'
-            VerifyCommand = 'dotnet'
-            Modules = @('development')
-            Modes = @('full', 'clean')
             Required = $false
         },
         @{
@@ -187,12 +142,75 @@
             Required = $false
         },
         @{
+            Name = 'mise-tool-pnpm'
+            Provider = 'mise'
+            PackageId = 'pnpm'
+            VerifyCommand = 'pnpm'
+            Modules = @('development')
+            Modes = @('full', 'clean')
+            Required = $false
+        },
+        @{
             Name = 'mise-tool-python'
             Provider = 'mise'
             PackageId = 'python'
             VerifyCommand = 'python'
             Modules = @('development')
             Modes = @('full', 'clean')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-go'
+            Provider = 'mise'
+            PackageId = 'go'
+            VerifyCommand = 'go'
+            Modules = @('development')
+            Modes = @('full', 'clean')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-rust'
+            Provider = 'mise'
+            PackageId = 'rust'
+            VerifyCommand = 'rustc'
+            Modules = @('development')
+            Modes = @('full')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-dotnet'
+            Provider = 'mise'
+            PackageId = 'dotnet'
+            VerifyCommand = 'dotnet'
+            Modules = @('development')
+            Modes = @('full', 'clean')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-gh'
+            Provider = 'mise'
+            PackageId = 'gh'
+            VerifyCommand = 'gh'
+            Modules = @('packages')
+            Modes = @('full', 'clean')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-codex'
+            Provider = 'mise'
+            PackageId = 'codex'
+            VerifyCommand = 'codex'
+            Modules = @('ai')
+            Modes = @('full')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-opencode'
+            Provider = 'mise'
+            PackageId = 'github:anomalyco/opencode'
+            VerifyCommand = 'opencode'
+            Modules = @('ai')
+            Modes = @('full')
             Required = $false
         },
         @{
@@ -227,16 +245,70 @@
             Provider = 'mise'
             PackageId = 'zoxide'
             VerifyCommand = 'zoxide'
+            Modules = @('shell')
+            Modes = @('full', 'clean')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-starship'
+            Provider = 'mise'
+            PackageId = 'starship'
+            VerifyCommand = 'starship'
+            Modules = @('shell', 'themes')
+            Modes = @('full', 'clean')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-eza'
+            Provider = 'mise'
+            PackageId = 'eza'
+            VerifyCommand = 'eza'
             Modules = @('packages')
             Modes = @('full', 'clean')
             Required = $false
         },
         @{
-            Name = 'mise-tool-usage'
+            Name = 'mise-tool-yazi'
             Provider = 'mise'
-            PackageId = 'cargo:usage-cli'
-            VerifyCommand = 'usage'
-            Modules = @('development')
+            PackageId = 'yazi'
+            VerifyCommand = 'yazi'
+            Modules = @('packages')
+            Modes = @('full')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-zellij'
+            Provider = 'mise'
+            PackageId = 'zellij'
+            VerifyCommand = 'zellij'
+            Modules = @('terminal')
+            Modes = @('full')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-delta'
+            Provider = 'mise'
+            PackageId = 'delta'
+            VerifyCommand = 'delta'
+            Modules = @('packages')
+            Modes = @('full', 'clean')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-lazygit'
+            Provider = 'mise'
+            PackageId = 'lazygit'
+            VerifyCommand = 'lazygit'
+            Modules = @('packages')
+            Modes = @('full')
+            Required = $false
+        },
+        @{
+            Name = 'mise-tool-go-jira'
+            Provider = 'mise'
+            PackageId = 'github:go-jira/jira'
+            VerifyCommand = 'jira'
+            Modules = @('secrets')
             Modes = @('full')
             Required = $false
         }

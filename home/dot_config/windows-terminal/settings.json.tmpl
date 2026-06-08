@@ -19,6 +19,15 @@
         "commandline": "pwsh.exe -NoExit -Command \"codex\"",
         "startingDirectory": "%USERPROFILE%"
       }
+    },
+    {
+      "id": "Windots.OpenCodeWsl",
+      "name": "OpenCode in Arch WSL",
+      "command": {
+        "action": "newTab",
+        "commandline": "wsl.exe -d Arch --cd ~ -- opencode",
+        "startingDirectory": "%USERPROFILE%"
+      }
     }
   ],
   "alwaysShowTabs": true,
@@ -77,6 +86,10 @@
     {
       "id": "Windots.CodexCli",
       "keys": "ctrl+alt+x"
+    },
+    {
+      "id": "Windots.OpenCodeWsl",
+      "keys": "ctrl+alt+o"
     }
   ],
   "launchMode": "maximized",
@@ -108,6 +121,18 @@
         "name": "PowerShell",
         "source": "Windows.Terminal.PowershellCore",
         "commandline": "pwsh.exe -NoLogo"
+      },
+      {
+        "guid": "{8b37a643-d310-5f6b-a9f8-c64852f65fd1}",
+        "name": "Arch WSL",
+        "commandline": "wsl.exe -d Arch --cd ~",
+        "startingDirectory": "%USERPROFILE%"
+      },
+      {
+        "guid": "{742ca4de-0e63-583b-97b5-c69f7a9f6b60}",
+        "name": "Arch Zellij",
+        "commandline": "wsl.exe -d Arch --cd ~ -- zellij attach -c main",
+        "startingDirectory": "%USERPROFILE%"
       }
     ]
   },

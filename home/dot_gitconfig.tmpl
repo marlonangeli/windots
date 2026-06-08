@@ -2,14 +2,31 @@
 	autocrlf = true
 	symlinks = true
 	longpaths = true
-	excludesfile = {{ .chezmoi.homeDir | quote }} + "\\.gitignore_global"
+	excludesfile = {{ printf "%s/.gitignore_global" .chezmoi.homeDir | quote }}
+	pager = delta
 [user]
 	name = {{ .name | quote }}
 	email = {{ .email | quote }}
 [credential]
 	helper = manager
+[init]
+	defaultBranch = main
 [push]
 	autoSetupRemote = true
+[pull]
+	ff = only
+[rerere]
+	enabled = true
+[merge]
+	conflictstyle = zdiff3
+[interactive]
+	diffFilter = delta --color-only
+[diff]
+	colorMoved = default
+[delta]
+	navigate = true
+	line-numbers = true
+	side-by-side = true
 [alias]
 	s = status -sb
 	co = checkout
@@ -17,5 +34,6 @@
 	ci = commit
 	st = status
 	d = diff
-[includeIf "gitdir:{{ .chezmoi.homeDir }}\\.local-repos\\"]
-	path = {{ .chezmoi.homeDir | quote }} + "\\.gitconfig.local"
+	l = log --oneline --graph --decorate -n 20
+[include]
+	path = {{ printf "%s/.gitconfig.local" .chezmoi.homeDir | quote }}

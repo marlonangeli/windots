@@ -9,208 +9,172 @@
  ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═════╝  ╚═════╝    ╚═╝   ╚══════╝
 ```
 
-Windows dotfiles managed with `chezmoi` and PowerShell automation.
+Windows dotfiles with `chezmoi`, PowerShell, `mise`, Starship, Zoxide, AI configs, and one small workflow CLI: `ilegna`.
 
-The repo is module-driven, idempotent, and designed for repeatable machine setup.
+The goal is simple: make a Windows dev machine useful fast, keep the repo easy to change, and leave the fun day-to-day commands outside the bootstrap path.
 
-## Why windots
+## First Run
 
-- Single entrypoint (`install.ps1`) for first install and day-2 operations.
-- Guided action menu (`INSTALL`, `UPDATE`, `RESTORE`, `QUIT`) with non-interactive flags.
-- Module orchestration with explicit dependency order.
-- Preflight checks and validation gates to reduce setup drift and surprises.
-
-## Requirements
-
-- Windows with `winget` available
-- PowerShell 7+ (installer relaunches into `pwsh` automatically when started from Windows PowerShell 5.1)
-- Git
-- [`chezmoi`](https://www.chezmoi.io/)
-
-These are checked during installer preflight (`scripts/common/preflight.ps1`).
-
-Optional tools (core dependencies like `gum` are installed automatically):
-
-- [`mise`](https://mise.jdx.dev)
-- [`bw`](https://bitwarden.com/help/cli/)
-- [`fzf`](https://github.com/junegunn/fzf) (used by `zi`/zoxide interactive jump)
-- [`usage`](https://github.com/jdx/usage) (installed via `mise` as `cargo:usage-cli`)
-- Visual Studio Build Tools 2022 with C++ workload (needed for cargo-built CLI tools on Windows)
-- [`jira-cli`](https://github.com/ankitpokhrel/jira-cli) (optional, prompted in `secrets` module, installed from GitHub releases)
-
-## Installation
-
-Canonical remote install:
+Remote install:
 
 ```powershell
 irm https://windots.ilegna.dev/install | iex
 ```
 
-Direct GitHub raw fallback:
+Local development from this repo:
 
 ```powershell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1")))
+chezmoi init --source .
+chezmoi apply
+pwsh ./scripts/bootstrap.ps1 -Mode full
+pwsh ./scripts/validate.ps1
 ```
 
-Run locally:
+Quick local link:
 
 ```powershell
-pwsh -NoProfile -File ./install.ps1
+pwsh ./scripts/link.ps1 -Apply
 ```
 
-## Installer Actions
+This sets `WINDOTS_REPO_ROOT` for the profile and applies dotfiles using the local repository as the `chezmoi` source.
 
-Interactive menu:
-
-- `INSTALL`: installs prerequisites, initializes source, runs bootstrap/validation.
-- `UPDATE`: runs safe update flow (`chezmoi update` + bootstrap + validation + verify).
-- `RESTORE`: replays install/bootstrap from restore config + secret env references.
-- `QUIT`: exits without changes.
-
-Non-interactive examples:
+## Daily Commands
 
 ```powershell
-# unattended install
-pwsh -NoProfile -File ./install.ps1 -Action install -AutoApply -NoPrompt
-
-# unattended update
-pwsh -NoProfile -File ./install.ps1 -Action update -NoPrompt
-
-# unattended restore with explicit config
-pwsh -NoProfile -File ./install.ps1 -Action restore -RestoreConfigPath "$env:LOCALAPPDATA\windots\state\restore.json" -NoPrompt
+pwsh ./scripts/bootstrap.ps1 -Mode clean -SkipInstall
+pwsh ./scripts/validate.ps1
+pwsh ./scripts/doctor.ps1
 ```
 
-Passing arguments from remote invocation:
+`ilegna` is the workflow CLI:
 
 ```powershell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/marlonangeli/windots/main/install.ps1"))) -Action install -AutoApply -NoPrompt -Mode full
+ilegna wt new feat/fun-cli --base main
+ilegna wt list
+ilegna pr new --base develop --draft
+ilegna pipeline list
+ilegna jira start ABC-123 "small task"
+ilegna jira stop --log
+ilegna config backup
+ilegna config list
+ilegna config restore latest --items ssh
 ```
 
-## Source Selection for Testing
-
-`install.ps1` supports testing from branch, ref, and local source:
+Direct script usage also works:
 
 ```powershell
-# branch
-pwsh -NoProfile -File ./install.ps1 -Branch feature/my-change -AutoApply
-
-# tag/commit (overrides branch)
-pwsh -NoProfile -File ./install.ps1 -Ref <sha-or-tag> -AutoApply
-
-# local repository
-pwsh -NoProfile -File ./install.ps1 -LocalRepoPath "C:\src\windots" -AutoApply
+pwsh ./scripts/ilegna.ps1 wt new feat/fun-cli --base main
 ```
 
-Safety guard for non-main validation:
+## Local Config Backup
+
+Before applying windots on a machine with existing custom config:
 
 ```powershell
-pwsh -NoProfile -File ./install.ps1 -RequireNonMain -Branch feature/my-change -AutoApply
+ilegna config backup
 ```
 
-`-RequireNonMain` fails fast if you accidentally run against `main` without an explicit `-Ref` or `-LocalRepoPath`.
+Backups are local only and are written to `%LOCALAPPDATA%\windots\backups\configs`.
 
-## Architecture
+Included by default:
 
-Module registry:
+- `.gitconfig`, `.gitconfig.local`, `.gitignore_global`
+- `.ssh/config`, `.ssh/config.local`, `.ssh/known_hosts`, `.ssh/config.d/`
 
-- `modules/module-registry.ps1`
+Restore a specific backup:
 
-High-level flow:
+```powershell
+ilegna config list
+ilegna config restore 20260605-153000
+ilegna config restore latest --items git
+ilegna config restore latest --items ssh
+```
+
+Restore asks before overwriting existing files and saves pre-restore copies. Use `--force` only when you intentionally want to overwrite without prompts.
+
+Keep personal Git aliases/scripts in `~/.gitconfig.local`; the managed `.gitconfig` includes it and chezmoi does not manage that local file.
+
+## Zellij Layouts
+
+```powershell
+zellij --layout dev
+zellij --layout opencode-terminal
+zellij --layout terminal-grid
+```
+
+The Zellij config sets `pwsh` as the default shell. `opencode-terminal` opens OpenCode next to two PowerShell panes.
+
+## What Gets Managed
+
+- `home/`: chezmoi source for files under `%USERPROFILE%`.
+- `home/dot_config/powershell/profile.d/`: fast modular PowerShell profile.
+- `home/dot_config/mise/config.toml.tmpl`: toolchain source of truth.
+- `home/dot_config/starship.toml`: minimal prompt.
+- `home/dot_gitconfig.tmpl`: Git defaults with `delta`, `rerere`, `pull.ff only`, and `zdiff3`.
+- `home/dot_config/windows-terminal/settings.json.tmpl`: PowerShell, Arch WSL, and Arch Zellij profiles.
+- `home/dot_wslconfig`: WSL defaults tuned for Docker/WSL dev.
+- `home/dot_config/ai/`: shared AI context, skills, and MCP references.
+- `home/dot_codex/config.toml.tmpl`: Codex config.
+- `home/dot_config/opencode/opencode.json.tmpl`: OpenCode config.
+
+## PowerShell Profile
+
+Modes:
+
+```powershell
+pmode
+pclean
+pfull
+reload
+```
+
+Startup profiling:
+
+```powershell
+$env:WINDOTS_PROFILE_DEBUG = "1"
+pwsh
+```
+
+Startup avoids external init scripts by default. `mise` uses shims/PATH; run activation only inside a shell that needs it:
+
+```powershell
+Enable-MiseActivation
+Enable-StarshipPrompt
+```
+
+## Module Bootstrap
+
+The bootstrap remains module-driven for install/setup work:
 
 ```text
 install.ps1
-  -> scripts/windots.ps1 (update/restore paths)
-  -> scripts/bootstrap.ps1 (module runner entry)
+  -> scripts/windots.ps1
+  -> scripts/bootstrap.ps1
       -> scripts/run-modules.ps1
           -> modules/<name>/module.ps1
-              -> modules/packages/manager.ps1 (when module declares packages)
 ```
 
-Main modules:
+Default modules:
 
-- `core`: base orchestration and chezmoi apply workflow
-- `packages`: shared package operations
-- `shell`: PowerShell profile and shell tooling
-- `development`: runtime/toolchain selection (dotnet/node/bun/python)
-- `themes`, `terminal`, `ai`, `mise`, `secrets`, `validate`
+- `core`: base tools and `chezmoi apply`.
+- `shell`: PowerShell profile shim and shell basics.
+- `mise`: trusts config and installs configured tools.
+- `packages`: optional GUI/CLI packages.
+- `development`: developer runtimes.
+- `themes`: Starship/font checks.
+- `terminal`: Windows Terminal templates.
+- `ai`: AI config sync.
 
-## Package Management
-
-Package source of truth:
-
-- `modules/packages/repository.psd1`
-
-Providers:
-
-- `modules/packages/provider-winget.ps1`
-- `modules/packages/provider-mise.ps1`
-
-Manager:
-
-- `modules/packages/manager.ps1`
-
-How it works:
-
-- Each package declares provider, package id, module mapping, modes, and required/optional state.
-- Modules install only packages mapped to themselves.
-- Interactive flows can choose default package set or specific optional packages.
-
-## Winget Contract
-
-All managed `winget install/upgrade` operations flow through:
-
-- `scripts/common/winget.ps1`
-
-Behavior:
-
-- Forces `--source winget`
-- Appends source/package agreement flags
-- Handles msstore certificate/source fallback (`0x8a15005e`)
-- Logs command and exit code, fails fast on unrecoverable errors
-
-## Day-2 Commands
+## Validation
 
 ```powershell
-pwsh ./scripts/windots.ps1 -Command update
-pwsh ./scripts/windots.ps1 -Command apply
-pwsh ./scripts/windots.ps1 -Command bootstrap -Mode clean
-pwsh ./scripts/windots.ps1 -Command restore -RestoreConfigPath "$env:LOCALAPPDATA\windots\state\restore.json"
-pwsh ./scripts/windots.ps1 -Command validate
+pwsh ./scripts/validate.ps1
+pwsh ./scripts/validate-modules.ps1
+pwsh ./tests/run.ps1
+pwsh ./tests/run.ps1 -IncludeIntegration
 ```
 
-## Validation and Tests
-
-Local validation:
-
-```powershell
-pwsh -NoProfile -File ./scripts/validate.ps1
-pwsh -NoProfile -File ./scripts/validate-modules.ps1
-```
-
-Full local test runner:
-
-```powershell
-pwsh -NoProfile -File ./tests/run.ps1
-```
-
-`tests/run.ps1` covers:
-
-- repository validation
-- optional lint (`PSScriptAnalyzer`)
-- Pester test suite
-- integration idempotency sequence (`chezmoi apply/verify/apply/diff`)
-
-## Repository Layout
-
-```text
-home/      # chezmoi templates (dotfiles + app configs)
-scripts/   # installer/orchestration/validation/common helpers
-modules/   # module entrypoints + module-owned automation
-tests/     # smoke, pester, integration runner assets
-docs/      # operational docs and architecture notes
-```
-
-## Documentation
+## Docs
 
 - [Setup](docs/SETUP.md)
 - [Restore](docs/RESTORE.md)

@@ -15,6 +15,9 @@ $targets = @(
     @{ Source = Join-Path $srcRoot "mcp"; Dest = Join-Path $homePath ".config\ai\mcp" },
     @{ Source = Join-Path $srcRoot "skills"; Dest = Join-Path $homePath ".config\ai\skills" }
 )
+$fileTargets = @(
+    @{ Source = Join-Path $srcRoot "AGENTS.md"; Dest = Join-Path $homePath ".config\ai\AGENTS.md" }
+)
 
 foreach ($target in $targets) {
     if (-not (Test-Path $target.Source)) {
@@ -38,4 +41,18 @@ foreach ($target in $targets) {
         Copy-Item -Path $target.Source -Destination $target.Dest -Recurse -Force
         Log-Info "folder copied: $($target.Source) -> $($target.Dest)"
     }
+}
+
+foreach ($target in $fileTargets) {
+    if (-not (Test-Path $target.Source)) {
+        throw "Missing AI source file: $($target.Source)"
+    }
+
+    $destParent = Split-Path -Parent $target.Dest
+    if (-not (Test-Path $destParent)) {
+        New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+    }
+
+    Copy-Item -Path $target.Source -Destination $target.Dest -Force
+    Log-Info "file copied: $($target.Source) -> $($target.Dest)"
 }

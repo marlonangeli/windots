@@ -1,3 +1,7 @@
 [skills]
 enabled = true
-discovery = "skills.sh"
+paths = [
+  "pr-workflow/SKILL.md",
+  "pipeline-triage/SKILL.md",
+  "jira-worklog/SKILL.md"
+]

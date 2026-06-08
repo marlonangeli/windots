@@ -44,7 +44,7 @@
 
 - `scripts/validate.ps1` is the main local integrity gate.
 - `scripts/validate-modules.ps1` validates module registry/dependency topology.
-- `tests/run.ps1` executes validation, optional lint, pester tests, and integration idempotency checks.
+- `tests/run.ps1` executes validation, optional lint, and Pester tests by default; integration idempotency is opt-in with `-IncludeIntegration`.
 - `scripts/windots.ps1 -Command update` and `-Command apply` both complete with validation and `chezmoi verify`.
 
 ## 8) Restore Contract
@@ -52,3 +52,22 @@
 - `scripts/windots.ps1 -Command restore` replays installation/bootstrap from restore config.
 - Restore config supports installer source options plus environment-backed secret references (`secretEnv`).
 - Raw secrets are intentionally excluded from tracked restore config.
+
+## 9) Workflow CLI Is Not Bootstrap
+
+- `scripts/ilegna.ps1` owns day-to-day helpers for worktrees, PRs, pipelines, and Jira.
+- The PowerShell profile only discovers and invokes `ilegna`; it does not import large workflow modules.
+- This keeps machine setup stable while allowing workflow commands to evolve or move into a separate repository.
+
+## 10) Fast Shell Startup
+
+- `mise` uses shims/PATH by default.
+- `mise activate` runs only when `Enable-MiseActivation` is called manually.
+- Starship runs only when `Enable-StarshipPrompt` is called or `WINDOTS_STARSHIP=1` is set.
+- Zoxide initializes lazily the first time `z` or `zi` is called.
+
+## 11) Local Config Safety
+
+- `ilegna config backup` captures machine-local Git and SSH host config before chezmoi applies managed files.
+- `ilegna config restore` never overwrites silently; it prompts or requires `--force` and saves pre-restore copies.
+- Personal Git aliases/scripts belong in `~/.gitconfig.local`, which is included by managed `.gitconfig` but not managed by chezmoi.

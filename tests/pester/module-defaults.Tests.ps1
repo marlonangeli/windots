@@ -1,20 +1,18 @@
-BeforeAll {
-    $repoRoot = Join-Path $PSScriptRoot "..\.."
-    . (Join-Path $repoRoot "modules\module-registry.ps1")
-}
+$repoRoot = Join-Path $PSScriptRoot "..\.."
+. (Join-Path $repoRoot "modules\module-registry.ps1")
 
 Describe "Windots default module profiles" {
     It "returns defaults for full mode" {
         $defaults = Get-WindotsDefaultModules -Mode full
-        $defaults | Should -Contain "core"
-        $defaults | Should -Contain "packages"
-        $defaults | Should -Contain "shell"
-        $defaults | Should -Contain "development"
+        ($defaults -contains "core") | Should Be $true
+        ($defaults -contains "packages") | Should Be $true
+        ($defaults -contains "shell") | Should Be $true
+        ($defaults -contains "development") | Should Be $true
     }
 
     It "returns defaults for clean mode" {
         $defaults = Get-WindotsDefaultModules -Mode clean
-        $defaults | Should -Contain "core"
-        $defaults | Should -Contain "terminal"
+        ($defaults -contains "core") | Should Be $true
+        ($defaults -contains "terminal") | Should Be $true
     }
 }

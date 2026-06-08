@@ -61,6 +61,8 @@ pwsh -NoProfile -File ./install.ps1 -RequireNonMain -Branch feature/my-change -A
 ## Manual Bootstrap
 
 ```powershell
+pwsh ./scripts/link.ps1 -Diff
+pwsh ./scripts/link.ps1 -Apply
 pwsh ./scripts/bootstrap.ps1 -Mode full
 ```
 
@@ -84,12 +86,55 @@ pwsh ./scripts/windots.ps1 -Command validate
 
 `update` and `apply` workflows both run validation and `chezmoi verify` after orchestration.
 
+## Workflow CLI
+
+`ilegna` is intentionally outside the bootstrap path. It can live in this repo or be copied into a separate workflow repo later.
+
+```powershell
+ilegna wt new feat/example --base main
+ilegna pr new --base develop
+ilegna pipeline list
+ilegna jira start ABC-123 "small task"
+ilegna config backup
+ilegna config restore latest --items ssh
+ilegna doctor
+```
+
+## Local Config Backup
+
+Run this before the first `chezmoi apply` on a machine that already has custom Git or SSH config:
+
+```powershell
+ilegna config backup
+```
+
+Backups live in `%LOCALAPPDATA%\windots\backups\configs` and include Git config plus SSH host config files such as `.ssh/config.local`, but not private SSH keys.
+
+```powershell
+ilegna config list
+ilegna config restore latest --items git
+ilegna config restore latest --items ssh
+```
+
+`restore` prompts before overwriting and stores a `pre-restore-*` copy of files it replaces. Put custom Git aliases/scripts in `~/.gitconfig.local`; windots includes that file without managing it.
+
+## Zellij Layouts
+
+```powershell
+zellij --layout dev
+zellij --layout opencode-terminal
+zellij --layout terminal-grid
+```
+
+The layouts use `pwsh`; `opencode-terminal` opens OpenCode next to terminal panes.
+
 ## Validation
 
 ```powershell
 pwsh -NoProfile -File ./scripts/validate.ps1
 pwsh -NoProfile -File ./scripts/validate-modules.ps1
 pwsh -NoProfile -File ./tests/run.ps1
+pwsh -NoProfile -File ./tests/run.ps1 -IncludeIntegration
 ```
 
 What is validated:
@@ -97,7 +142,7 @@ What is validated:
 - required files and module contracts
 - module dependency graph
 - secret-pattern checks in managed script/template trees
-- idempotency via integration workflow in `tests/run.ps1`
+- idempotency via opt-in integration workflow in `tests/run.ps1 -IncludeIntegration`
 
 ## Module Utility Scripts
 
@@ -105,6 +150,7 @@ What is validated:
   - `pwsh ./modules/shell/profile-shim.ps1 -Action status`
   - `pwsh ./modules/shell/profile-shim.ps1 -Action reset`
 - AI config sync
+  - `pwsh ./scripts/ai-sync.ps1`
   - `pwsh ./modules/ai/link-configs.ps1`
   - `pwsh ./modules/ai/link-configs.ps1 -UseSymlink`
 - Secrets helpers
