@@ -13,7 +13,9 @@ if (-not (Get-Command chezmoi -ErrorAction SilentlyContinue)) {
 }
 
 [Environment]::SetEnvironmentVariable("WINDOTS_REPO_ROOT", $repoRoot, "User")
+[Environment]::SetEnvironmentVariable("SHELL", "pwsh", "User")
 $env:WINDOTS_REPO_ROOT = $repoRoot
+$env:SHELL = "pwsh"
 
 Write-Host "WINDOTS_REPO_ROOT=$repoRoot" -ForegroundColor Green
 
