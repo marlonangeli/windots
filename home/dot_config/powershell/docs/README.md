@@ -16,6 +16,8 @@ pfull
 reload
 ```
 
+Starship is the default prompt when the cached init script exists; otherwise the profile falls back to a plain PowerShell prompt.
+
 Debug startup time:
 
 ```powershell
@@ -44,7 +46,7 @@ Workflow commands live in `scripts/ilegna.ps1` instead of large profile modules:
 
 ```powershell
 ilegna wt new feat/fun-cli --base main
-ilegna pr new --base develop
+ilegna pr new
 ilegna pipeline list
 ilegna jira start ABC-123 "small task"
 ```

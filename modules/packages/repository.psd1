@@ -302,15 +302,6 @@
             Modules = @('packages')
             Modes = @('full')
             Required = $false
-        },
-        @{
-            Name = 'mise-tool-go-jira'
-            Provider = 'mise'
-            PackageId = 'github:go-jira/jira'
-            VerifyCommand = 'jira'
-            Modules = @('secrets')
-            Modes = @('full')
-            Required = $false
         }
     )
 }

@@ -47,7 +47,7 @@ Examples:
   ilegna wt open feat/fun-cli
   ilegna git-bare sync main
   ilegna git-bare sync --all --tags
-  ilegna pr new --base develop --draft
+  ilegna pr new
   ilegna pipeline list
   ilegna jira start ABC-123 "implement CLI"
   ilegna config backup
@@ -798,47 +798,53 @@ function Invoke-IlegnaPullRequest {
     if ([string]::IsNullOrWhiteSpace($Subcommand)) { $Subcommand = "list" }
     $parsed = Split-IlegnaArgs -InputArgs $InputArgs
 
+    function Assert-AzureCli {
+        if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+            throw "Azure CLI not found. Install az and the azure-devops extension to use ilegna pr."
+        }
+    }
+
+    function Get-PullRequestId {
+        $id = Get-IlegnaOption -Parsed $parsed -Names @("id", "pr")
+        if (-not [string]::IsNullOrWhiteSpace($id)) { return $id }
+        return ($parsed.Positionals | Select-Object -First 1)
+    }
+
     switch ($Subcommand.ToLowerInvariant()) {
-        "new" {
+        { $_ -in @("new", "create") } {
             Assert-GitRepository
-            $base = Get-IlegnaOption -Parsed $parsed -Names @("base", "target") -Default (Get-DefaultBranch)
+            Assert-AzureCli
+
+            $base = Get-IlegnaOption -Parsed $parsed -Names @("base", "target") -Default "develop"
             $title = Get-IlegnaOption -Parsed $parsed -Names @("title")
             $body = Get-IlegnaOption -Parsed $parsed -Names @("body")
-            $draft = Test-IlegnaFlag -Parsed $parsed -Names @("draft")
+            $draft = -not (Test-IlegnaFlag -Parsed $parsed -Names @("ready", "no-draft"))
             $currentBranch = Get-CurrentBranch
+            if ([string]::IsNullOrWhiteSpace($currentBranch)) { throw "Unable to resolve current branch." }
 
-            if (Get-Command gh -ErrorAction SilentlyContinue) {
-                $ghArgs = @("pr", "create", "--base", $base)
-                if ($draft) { $ghArgs += "--draft" }
-                if ($title) { $ghArgs += @("--title", $title) } else { $ghArgs += "--fill" }
-                if ($body) { $ghArgs += @("--body", $body) }
-                gh @ghArgs
-                return
-            }
-
-            if (Get-Command az -ErrorAction SilentlyContinue) {
-                if ([string]::IsNullOrWhiteSpace($title)) { $title = $currentBranch }
-                $azArgs = @("repos", "pr", "create", "--source-branch", $currentBranch, "--target-branch", $base, "--title", $title)
-                if ($draft) { $azArgs += @("--draft", "true") }
-                if ($body) { $azArgs += @("--description", $body) }
-                az @azArgs
-                return
-            }
-
-            throw "Install gh or az to create pull requests."
+            if ([string]::IsNullOrWhiteSpace($title)) { $title = $currentBranch }
+            $azArgs = @("repos", "pr", "create", "--source-branch", $currentBranch, "--target-branch", $base, "--title", $title, "--draft", $draft.ToString().ToLowerInvariant())
+            if ($body) { $azArgs += @("--description", $body) }
+            az @azArgs
         }
         "list" {
-            if (Get-Command gh -ErrorAction SilentlyContinue) { gh pr list @InputArgs; return }
-            if (Get-Command az -ErrorAction SilentlyContinue) { az repos pr list @InputArgs; return }
-            throw "Install gh or az to list pull requests."
+            Assert-AzureCli
+            az repos pr list @InputArgs
         }
-        "view" {
-            if (Get-Command gh -ErrorAction SilentlyContinue) { gh pr view --web @InputArgs; return }
-            throw "Install gh to view pull requests from this command."
+        { $_ -in @("view", "show", "open") } {
+            Assert-AzureCli
+            $id = Get-PullRequestId
+            if ([string]::IsNullOrWhiteSpace($id)) { throw "Usage: ilegna pr view <id> [--open]" }
+
+            $azArgs = @("repos", "pr", "show", "--id", $id)
+            if ($Subcommand.ToLowerInvariant() -eq "open" -or (Test-IlegnaFlag -Parsed $parsed -Names @("open", "web"))) { $azArgs += "--open" }
+            az @azArgs
         }
         "checkout" {
-            if (Get-Command gh -ErrorAction SilentlyContinue) { gh pr checkout @InputArgs; return }
-            throw "Install gh to checkout pull requests."
+            Assert-AzureCli
+            $id = Get-PullRequestId
+            if ([string]::IsNullOrWhiteSpace($id)) { throw "Usage: ilegna pr checkout <id>" }
+            az repos pr checkout --id $id
         }
         default {
             throw "Unknown pr command: $Subcommand"
@@ -938,6 +944,39 @@ function Get-IlegnaTimer {
     Get-Content -Path $path -Raw | ConvertFrom-Json
 }
 
+function Resolve-IlegnaJiraCli {
+    [CmdletBinding()]
+    param()
+
+    $candidates = @(
+        $env:WINDOTS_JIRA_CLI,
+        $env:JIRA_CLI,
+        "C:\tools\jira-cli\jira.exe"
+    )
+
+    if ($env:LOCALAPPDATA) {
+        $candidates += (Join-Path $env:LOCALAPPDATA "Programs\jira-cli\jira.exe")
+    }
+
+    foreach ($candidate in @($candidates)) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
+
+    $command = Get-Command jira -ErrorAction SilentlyContinue
+    if ($command) { return $command.Source }
+
+    throw "jira CLI not found. Install ankitpokhrel/jira-cli or place jira.exe in C:\tools\jira-cli."
+}
+
+function Invoke-IlegnaJiraCli {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string[]]$Arguments)
+
+    $jiraPath = Resolve-IlegnaJiraCli
+    & $jiraPath @Arguments
+}
+
 function Invoke-IlegnaJira {
     [CmdletBinding()]
     param(
@@ -950,12 +989,12 @@ function Invoke-IlegnaJira {
 
     switch ($Subcommand.ToLowerInvariant()) {
         "me" {
-            if (-not (Get-Command jira -ErrorAction SilentlyContinue)) { throw "jira CLI not found." }
-            jira me
+            Invoke-IlegnaJiraCli -Arguments @("me")
         }
         "mine" {
-            if (-not (Get-Command jira -ErrorAction SilentlyContinue)) { throw "jira CLI not found." }
-            jira issue list --assignee "@me" @InputArgs
+            [string[]]$jiraArgs = @("issue", "list", "--jql", "assignee = currentUser() ORDER BY updated DESC")
+            if ($InputArgs) { $jiraArgs += @($InputArgs) }
+            Invoke-IlegnaJiraCli -Arguments $jiraArgs
         }
         "start" {
             $issue = $parsed.Positionals | Select-Object -First 1
@@ -989,9 +1028,8 @@ function Invoke-IlegnaJira {
             $log = Test-IlegnaFlag -Parsed $parsed -Names @("log")
 
             if ($log) {
-                if (-not (Get-Command jira -ErrorAction SilentlyContinue)) { throw "jira CLI not found." }
                 $comment = if ($timer.description) { $timer.description } else { "Work logged from ilegna" }
-                jira issue worklog add $timer.issue --time-spent "$($minutes)m" --comment $comment
+                Invoke-IlegnaJiraCli -Arguments @("issue", "worklog", "add", $timer.issue, "$($minutes)m", "--comment", $comment, "--no-input")
             }
 
             Remove-Item -Path (Get-IlegnaTimerPath) -Force
@@ -1021,6 +1059,17 @@ function Invoke-IlegnaDoctor {
     )
 
     foreach ($check in $checks) {
+        if ($check.Name -eq "jira") {
+            try {
+                $null = Resolve-IlegnaJiraCli
+                Write-IlegnaLine ("ok   {0}" -f $check.Name) Green
+            }
+            catch {
+                Write-IlegnaLine ("miss {0}" -f $check.Name) Yellow
+            }
+            continue
+        }
+
         if (Get-Command $check.Command -ErrorAction SilentlyContinue) {
             Write-IlegnaLine ("ok   {0}" -f $check.Name) Green
         }

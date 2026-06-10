@@ -25,8 +25,9 @@ $bw = $null -ne (Get-Command bw -ErrorAction SilentlyContinue)
 $bwMessage = if ($bw) { "installed" } else { "optional, but recommended for runtime secret retrieval" }
 Write-Status -Name "Bitwarden CLI (bw)" -Ok $bw -Message $bwMessage
 
-$jira = $null -ne (Get-Command jira -ErrorAction SilentlyContinue)
-$jiraMessage = if ($jira) { "installed" } else { "optional, only needed for Jira worklog integration" }
+$jiraPath = if (Test-Path -LiteralPath "C:\tools\jira-cli\jira.exe") { "C:\tools\jira-cli\jira.exe" } else { (Get-Command jira -ErrorAction SilentlyContinue).Source }
+$jira = -not [string]::IsNullOrWhiteSpace($jiraPath)
+$jiraMessage = if ($jira) { "installed at $jiraPath" } else { "optional, only needed for Jira worklog integration" }
 Write-Status -Name "Jira CLI (jira)" -Ok $jira -Message $jiraMessage
 
 $gitignorePath = Join-Path $repoRoot ".gitignore"
