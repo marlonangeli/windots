@@ -2,6 +2,7 @@ if (-not (Test-InteractiveShell)) { return }
 
 $global:__WindotsStarshipCache = Join-Path $HOME ".cache\windots\starship-init.ps1"
 $global:__WindotsStarshipLoaded = $false
+$global:__WindotsStarshipAttempted = $false
 
 function Invoke-WindotsFallbackPrompt {
     $path = $ExecutionContext.SessionState.Path.CurrentLocation
@@ -38,8 +39,11 @@ function Enable-MiseActivation {
 }
 
 function global:prompt {
-    if (-not $global:__WindotsStarshipLoaded -and (Enable-StarshipPrompt)) {
-        return (& $function:prompt)
+    if (-not $global:__WindotsStarshipLoaded -and -not $global:__WindotsStarshipAttempted) {
+        $global:__WindotsStarshipAttempted = $true
+        if (Enable-StarshipPrompt) {
+            return (& $function:prompt)
+        }
     }
 
     Invoke-WindotsFallbackPrompt

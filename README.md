@@ -56,7 +56,7 @@ ilegna wt list
 ilegna git-bare sync main
 ilegna git-bare sync --all --tags
 ilegna git-bare status --all
-ilegna pr new --base develop --draft
+ilegna pr new
 ilegna pipeline list
 ilegna jira start ABC-123 "small task"
 ilegna jira stop --log
@@ -140,11 +140,10 @@ $env:WINDOTS_PROFILE_DEBUG = "1"
 pwsh
 ```
 
-Startup avoids external init scripts by default. `mise` uses shims/PATH; run activation only inside a shell that needs it:
+Starship loads by default from the cached init script. `mise` uses shims/PATH; run activation only inside a shell that needs it:
 
 ```powershell
 Enable-MiseActivation
-Enable-StarshipPrompt
 ```
 
 ## Module Bootstrap

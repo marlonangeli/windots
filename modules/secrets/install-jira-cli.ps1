@@ -36,9 +36,45 @@ function Add-UserPathEntry {
     }
 }
 
-if (Get-Command jira -ErrorAction SilentlyContinue) {
-    Log-PackageStatus -Package "jira-cli" -Status "is installed" -StatusColor Green
-    return
+function Test-AnkitJiraCli {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Command)
+
+    try {
+        $help = & $Command --help 2>&1 | Out-String
+        return ($help -match 'ankitpokhrel/jira-cli')
+    }
+    catch {
+        return $false
+    }
+}
+
+function Get-JiraCliInstallDir {
+    [CmdletBinding()]
+    param()
+
+    if (-not [string]::IsNullOrWhiteSpace($env:WINDOTS_JIRA_CLI_DIR)) {
+        return $env:WINDOTS_JIRA_CLI_DIR
+    }
+
+    $toolsRoot = "C:\tools"
+    if (Test-Path -LiteralPath $toolsRoot) {
+        return (Join-Path $toolsRoot "jira-cli")
+    }
+
+    return (Join-Path $env:LOCALAPPDATA "Programs\jira-cli")
+}
+
+$installDir = Get-JiraCliInstallDir
+$targetExe = Join-Path $installDir "jira.exe"
+
+foreach ($candidate in @($targetExe, (Get-Command jira -ErrorAction SilentlyContinue).Source)) {
+    if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+    if ((Test-Path -LiteralPath $candidate) -and (Test-AnkitJiraCli -Command $candidate)) {
+        Add-UserPathEntry -Entry (Split-Path -Parent $candidate)
+        Log-PackageStatus -Package "jira-cli" -Status "is installed" -StatusColor Green
+        return
+    }
 }
 
 Log-PackageStatus -Package "jira-cli" -Status "is not installed" -StatusColor Cyan
@@ -64,8 +100,6 @@ if (-not $asset -or -not $asset.browser_download_url) {
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("windots-jira-cli-" + [guid]::NewGuid().ToString("N"))
 $zipPath = Join-Path $tempRoot $asset.name
 $extractPath = Join-Path $tempRoot "extract"
-$installDir = Join-Path $env:LOCALAPPDATA "Programs\jira-cli"
-$targetExe = Join-Path $installDir "jira.exe"
 
 try {
     New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null

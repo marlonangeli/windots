@@ -37,16 +37,13 @@ function Resolve-IlegnaScript {
 }
 
 function ilegna {
-    [CmdletBinding()]
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$CommandArgs)
-
     $scriptPath = Resolve-IlegnaScript
     if (-not $scriptPath) {
         Write-Error "ilegna CLI not found. Set ILEGNA_CLI or run from a chezmoi-managed windots source."
         return
     }
 
-    & $scriptPath @CommandArgs
+    & $scriptPath @args
 }
 
 Set-Alias il ilegna -Force -ErrorAction SilentlyContinue

@@ -11,6 +11,6 @@ Checklist:
 
 - Inspect `git status -sb` before changing branches.
 - Prefer `ilegna wt new <branch> --base <base>` for parallel work.
-- Prefer `ilegna pr new --base <target>` to create PRs.
+- Prefer `ilegna pr new` to create Azure DevOps draft PRs to `develop`.
 - Include validation output in the PR description when available.
 - Do not force-push or rewrite history unless explicitly requested.

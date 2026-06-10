@@ -63,7 +63,7 @@
 
 - `mise` uses shims/PATH by default.
 - `mise activate` runs only when `Enable-MiseActivation` is called manually.
-- Starship runs only when `Enable-StarshipPrompt` is called or `WINDOTS_STARSHIP=1` is set.
+- Starship loads by default from a cached init script and falls back to a plain prompt if the cache is missing.
 - Zoxide initializes lazily the first time `z` or `zi` is called.
 
 ## 11) Local Config Safety

@@ -94,7 +94,7 @@ pwsh ./scripts/windots.ps1 -Command validate
 ilegna wt new feat/example --base main
 ilegna wt new -i
 ilegna wt new fix/courier --base main
-ilegna pr new --base develop
+ilegna pr new
 ilegna pipeline list
 ilegna jira start ABC-123 "small task"
 ilegna config backup
@@ -158,7 +158,7 @@ What is validated:
 - Secrets helpers
   - `pwsh ./modules/secrets/migrate.ps1`
   - `pwsh ./modules/secrets/deps-check.ps1`
-  - `pwsh ./modules/secrets/install-jira-cli.ps1` (optional, installs from GitHub release)
+  - `pwsh ./modules/secrets/install-jira-cli.ps1` (optional, installs `ankitpokhrel/jira-cli`; prefers `C:\tools\jira-cli` when available)
 
 ## Winget Behavior
 

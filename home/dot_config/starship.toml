@@ -1,5 +1,7 @@
 add_newline = false
-command_timeout = 800
+command_timeout = 500
+scan_timeout = 500
+format = "$directory$character"
 
 [character]
 success_symbol = "[>](bold green)"
@@ -10,20 +12,25 @@ truncation_length = 3
 truncate_to_repo = true
 
 [git_branch]
+disabled = false
 symbol = "git:"
 format = "[$symbol$branch]($style) "
 
 [git_status]
+disabled = false
 format = "[$all_status$ahead_behind]($style) "
 
 [nodejs]
+disabled = true
 format = "[node $version]($style) "
 
 [bun]
 disabled = true
 
 [python]
+disabled = true
 format = "[py $version]($style) "
 
 [dotnet]
+disabled = false
 format = "[dotnet $version]($style) "
