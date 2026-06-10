@@ -41,16 +41,9 @@ if (-not $SkipLint) {
             return
         }
 
-        $targets = @(
-            (Join-Path $repoRoot "install.ps1"),
-            (Join-Path $repoRoot "scripts"),
-            (Join-Path $repoRoot "tests")
-        )
-
-        $issues = Invoke-ScriptAnalyzer -Path $targets -Recurse
-        if ($issues) {
-            $issues | Format-Table -AutoSize | Out-String | Write-Host
-            throw "PSScriptAnalyzer found issues."
+        & (Join-Path $repoRoot "scripts\lint.ps1")
+        if (-not $?) {
+            throw "scripts/lint.ps1 failed"
         }
     }
 }

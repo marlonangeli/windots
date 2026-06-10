@@ -71,6 +71,7 @@ function Invoke-WindotsModuleShell {
         Ensure-WindotsModulePackages -Module "shell" -Mode $mode -WhatIf:$Context.WhatIf
 
         Ensure-WindotsPowerShellModule -Name "PSReadLine" -WhatIf:$Context.WhatIf -NoPrompt:$Context.NoPrompt -Required
+        Ensure-WindotsPowerShellModule -Name "PSScriptAnalyzer" -WhatIf:$Context.WhatIf -NoPrompt:$Context.NoPrompt -Required
     }
 
     $scriptPath = Join-Path $PSScriptRoot "profile-shim.ps1"

@@ -1,4 +1,10 @@
 @{
+    IncludeRules = @(
+        "PSUseConsistentIndentation",
+        "PSPlaceOpenBrace",
+        "PSPlaceCloseBrace"
+    )
+
     Rules = @{
         PSUseConsistentIndentation = @{
             Enable = $true

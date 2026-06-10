@@ -1,0 +1,26 @@
+{
+  "languages": {
+    "PowerShell": {
+      "tab_size": 4,
+      "hard_tabs": false,
+      "line_ending": "enforce_lf",
+      "ensure_final_newline_on_save": true,
+      "remove_trailing_whitespace_on_save": true,
+      "format_on_save": "on",
+      "formatter": "language_server",
+      "language_servers": ["powershell-es", "..."]
+    }
+  },
+  "lsp": {
+    "powershell-es": {
+      "settings": {
+        "powershell": {
+          "scriptAnalysis": {
+            "enable": true,
+            "settingsPath": "./scripts/psscriptanalyzer.psd1"
+          }
+        }
+      }
+    }
+  }
+}
