@@ -1,4 +1,4 @@
-add_newline = false
+add_newline = true
 command_timeout = 2000
 scan_timeout = 500
 format = "$directory$git_branch$git_status$dotnet$character"
@@ -12,23 +12,19 @@ truncation_length = 3
 truncate_to_repo = true
 
 [git_branch]
-symbol = "git:"
-format = "[$symbol$branch]($style)"
 
 [git_status]
-format = "[$all_status$ahead_behind]($style)"
 ignore_submodules = true
 
 [nodejs]
 disabled = true
-format = "[node $version]($style)"
 
 [bun]
 disabled = true
 
 [python]
 disabled = true
-format = "[py $version]($style)"
 
 [dotnet]
-format = "[dotnet $version]($style)"
+format = "[$symbol$version]($style) "
+symbol = ".NET "
