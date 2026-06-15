@@ -62,4 +62,15 @@ Describe "ilegna command surface" {
         $content | Should Not Match '--time-spent'
         $pathProfileContent | Should Match 'C:\\tools\\jira-cli'
     }
+
+    It "supports Azure pipeline discovery and triggers" {
+        $content | Should Match 'Get-AzurePipelineRepositoryName'
+        $content | Should Match '"pipelines", "list", "--repository"'
+        $content | Should Match 'Select-AzureEnabledPipelineDefinitions'
+        $content | Should Match '"pipelines", "run", "--id"'
+        $content | Should Match '"approvals"'
+        $content | Should Match '"complete", "approve"'
+        $content | Should Match '"devops", "invoke", "--area", "release", "--resource", "approvals"'
+        $content | Should Match '"statusFilter=\$statusFilter"'
+    }
 }

@@ -36,7 +36,7 @@ Resources:
   wt          git worktrees: list, new, remove, open, status, prune
   git-bare    bare repos: sync, status, refs, path
   pr          pull requests: new, list, view, checkout
-  pipeline    CI runs: list, watch, open
+  pipeline    CI runs: list, watch, open, active, trigger, approvals, complete
   jira        Jira helpers: me, mine, start, show, stop
   config      local config backups: backup, list, restore
   doctor      quick local environment check
@@ -49,6 +49,8 @@ Examples:
   ilegna git-bare sync --all --tags
   ilegna pr new
   ilegna pipeline list
+  ilegna pipeline active
+  ilegna pipeline trigger --dry-run
   ilegna jira start ABC-123 "implement CLI"
   ilegna config backup
   ilegna config restore latest --items ssh
@@ -863,13 +865,241 @@ function Invoke-IlegnaPipeline {
     $hostName = Get-RepositoryHost
     $parsed = Split-IlegnaArgs -InputArgs $InputArgs
 
+    function Assert-AzureCli {
+        if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+            throw "Azure CLI not found. Install az and the azure-devops extension to use Azure Pipelines commands."
+        }
+    }
+
     function Get-PipelineRunId {
         $id = Get-IlegnaOption -Parsed $parsed -Names @("id", "run")
         if (-not [string]::IsNullOrWhiteSpace($id)) { return $id }
         return ($parsed.Positionals | Select-Object -First 1)
     }
 
+    function Get-AzureDevOpsRemoteUrl {
+        $remote = git remote get-url origin 2>$null
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($remote)) { return $remote.Trim() }
+        return $null
+    }
+
+    function Get-AzureDevOpsProjectName {
+        $project = Get-IlegnaOption -Parsed $parsed -Names @("project", "p")
+        if (-not [string]::IsNullOrWhiteSpace($project)) { return $project }
+
+        $remote = Get-AzureDevOpsRemoteUrl
+        if ([string]::IsNullOrWhiteSpace($remote)) { return $null }
+
+        if ($remote -match '/([^/]+)/_git/[^/]+/?$') { return [uri]::UnescapeDataString($Matches[1]) }
+        if ($remote -match '/v3/[^/]+/([^/]+)/[^/]+/?$') { return [uri]::UnescapeDataString($Matches[1]) }
+        return $null
+    }
+
+    function Get-AzurePipelineRepositoryName {
+        param([switch]$AllowPositional)
+
+        $repo = Get-IlegnaOption -Parsed $parsed -Names @("repo", "repository", "r")
+        if ([string]::IsNullOrWhiteSpace($repo) -and $AllowPositional) {
+            $repo = $parsed.Positionals | Select-Object -First 1
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($repo)) { return $repo }
+
+        $remote = Get-AzureDevOpsRemoteUrl
+        if ([string]::IsNullOrWhiteSpace($remote)) { throw "Unable to resolve repository. Pass --repo <name>." }
+
+        if ($remote -match '/_git/([^/]+?)(?:\.git)?/?$') { return [uri]::UnescapeDataString($Matches[1]) }
+        if ($remote -match '/v3/[^/]+/[^/]+/([^/]+?)(?:\.git)?/?$') { return [uri]::UnescapeDataString($Matches[1]) }
+        throw "Unable to resolve Azure repository from origin. Pass --repo <name>."
+    }
+
+    function Get-AzurePipelineRepositoryType {
+        Get-IlegnaOption -Parsed $parsed -Names @("repo-type", "repository-type") -Default "tfsgit"
+    }
+
+    function Get-AzurePipelineDefinitions {
+        param(
+            [Parameter(Mandatory)][string]$Repository,
+            [Parameter(Mandatory)][string]$RepositoryType,
+            [string]$Name
+        )
+
+        $azArgs = @("pipelines", "list", "--repository", $Repository, "--repository-type", $RepositoryType, "--query-order", "ModifiedDesc", "-o", "json")
+        if (-not [string]::IsNullOrWhiteSpace($Name)) { $azArgs += @("--name", $Name) }
+
+        $json = az @azArgs
+        if ($LASTEXITCODE -ne 0) { throw "Unable to list Azure pipelines for repository '$Repository'." }
+        if ([string]::IsNullOrWhiteSpace(($json | Out-String))) { return @() }
+
+        $definitions = ($json | Out-String) | ConvertFrom-Json
+        return @($definitions)
+    }
+
+    function Select-AzureEnabledPipelineDefinitions {
+        param([object[]]$Definitions)
+
+        $enabled = @()
+        foreach ($definition in @($Definitions)) {
+            $hasEnabledStatus = $definition.queueStatus -eq "enabled" -or $definition.status -eq "enabled"
+            $hasNoStatus = [string]::IsNullOrWhiteSpace($definition.queueStatus) -and [string]::IsNullOrWhiteSpace($definition.status)
+            if ($hasEnabledStatus -or $hasNoStatus) { $enabled += $definition }
+        }
+
+        return @($enabled)
+    }
+
+    function Write-AzurePipelineDefinitions {
+        param([object[]]$Definitions)
+
+        if (-not $Definitions -or $Definitions.Count -eq 0) {
+            Write-IlegnaLine "No matching Azure pipelines found." Yellow
+            return
+        }
+
+        foreach ($definition in @($Definitions)) {
+            $details = $definition
+            if ($definition.id -and -not $definition.repository) {
+                $detailsJson = az pipelines show --id $definition.id -o json 2>$null
+                if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($detailsJson | Out-String))) {
+                    $details = ($detailsJson | Out-String) | ConvertFrom-Json
+                }
+            }
+
+            $status = if ($details.queueStatus) { $details.queueStatus } elseif ($details.status) { $details.status } else { "unknown" }
+            $repo = if ($details.repository.name) { $details.repository.name } else { "unknown" }
+            $yaml = if ($details.process.yamlFilename) { $details.process.yamlFilename } else { "<classic>" }
+            Write-IlegnaLine ("{0} {1} status={2} repo={3} yaml={4}" -f $details.id, $details.name, $status, $repo, $yaml) Cyan
+        }
+    }
+
+    function Resolve-AzurePipelineDefinition {
+        param([switch]$AllowPositionalRepository)
+
+        $id = Get-IlegnaOption -Parsed $parsed -Names @("id", "pipeline-id")
+        if (-not [string]::IsNullOrWhiteSpace($id)) {
+            $json = az pipelines show --id $id -o json
+            if ($LASTEXITCODE -ne 0) { throw "Unable to resolve Azure pipeline id '$id'." }
+            return (($json | Out-String) | ConvertFrom-Json)
+        }
+
+        $name = Get-IlegnaOption -Parsed $parsed -Names @("name", "pipeline")
+        $repo = Get-AzurePipelineRepositoryName -AllowPositional:$AllowPositionalRepository
+        $repoType = Get-AzurePipelineRepositoryType
+        $definitions = @(Get-AzurePipelineDefinitions -Repository $repo -RepositoryType $repoType -Name $name)
+        $enabled = @(Select-AzureEnabledPipelineDefinitions -Definitions $definitions)
+
+        if (-not $enabled -or $enabled.Count -eq 0) {
+            Write-AzurePipelineDefinitions -Definitions $definitions
+            throw "No enabled Azure pipeline found for repository '$repo'. Pass --id <pipeline-id> or --name <pipeline-name>."
+        }
+
+        if ($enabled.Count -gt 1) {
+            Write-AzurePipelineDefinitions -Definitions $enabled
+            throw "Multiple enabled Azure pipelines found for repository '$repo'. Pass --id <pipeline-id> or --name <pipeline-name>."
+        }
+
+        return $enabled[0]
+    }
+
+    function Get-AzurePipelineBranch {
+        $branch = Get-IlegnaOption -Parsed $parsed -Names @("branch", "b")
+        if (-not [string]::IsNullOrWhiteSpace($branch)) { return $branch }
+
+        $currentBranch = Get-CurrentBranch
+        if (-not [string]::IsNullOrWhiteSpace($currentBranch)) { return $currentBranch }
+        return $null
+    }
+
+    function Invoke-AzurePipelineApprovals {
+        param([switch]$Approve)
+
+        Assert-AzureCli
+        $project = Get-AzureDevOpsProjectName
+        $approvalId = Get-IlegnaOption -Parsed $parsed -Names @("approval-id", "approval", "id")
+        if ([string]::IsNullOrWhiteSpace($approvalId)) {
+            $approvalId = $parsed.Positionals | Select-Object -First 1
+        }
+
+        $apiVersion = Get-IlegnaOption -Parsed $parsed -Names @("api-version") -Default "7.0"
+        $azArgs = @("devops", "invoke", "--area", "release", "--resource", "approvals", "--api-version", $apiVersion, "-o", "json")
+        if (-not [string]::IsNullOrWhiteSpace($project)) { $azArgs += @("--route-parameters", "project=$project") }
+
+        if (-not $Approve -or [string]::IsNullOrWhiteSpace($approvalId)) {
+            $statusFilter = Get-IlegnaOption -Parsed $parsed -Names @("status", "status-filter") -Default "pending"
+            $listArgs = @($azArgs + @("--query-parameters", "statusFilter=$statusFilter"))
+            az @listArgs
+            if ($LASTEXITCODE -ne 0) { throw "Unable to list Azure DevOps release approvals through az devops invoke." }
+            if ($Approve) { throw "Pass an approval id: ilegna pipeline complete --approval-id <id> [--comment <text>]" }
+            return
+        }
+
+        $comment = Get-IlegnaOption -Parsed $parsed -Names @("comment", "message") -Default "Approved by ilegna pipeline complete"
+        $status = Get-IlegnaOption -Parsed $parsed -Names @("status") -Default "approved"
+        $payload = @{
+            status = $status
+            comments = $comment
+        } | ConvertTo-Json -Depth 5
+        $patchArgs = @($azArgs + @("--http-method", "PATCH", "--query-parameters", "approvalId=$approvalId"))
+        if (Test-IlegnaFlag -Parsed $parsed -Names @("dry-run", "whatif")) {
+            Write-IlegnaLine ("az {0} --in-file <payload>" -f ($patchArgs -join " ")) DarkGray
+            Write-IlegnaLine $payload DarkGray
+            return
+        }
+
+        $tempFile = New-TemporaryFile
+
+        try {
+            Set-Content -LiteralPath $tempFile.FullName -Value $payload -Encoding UTF8
+            az @($patchArgs + @("--in-file", $tempFile.FullName))
+            if ($LASTEXITCODE -ne 0) { throw "Unable to update Azure DevOps release approval '$approvalId'." }
+        }
+        finally {
+            Remove-Item -LiteralPath $tempFile.FullName -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     switch ($Subcommand.ToLowerInvariant()) {
+        { $_ -in @("active", "definitions") } {
+            if ($hostName -ne "azure") { throw "Pipeline discovery by repository is only implemented for Azure DevOps repositories." }
+            Assert-AzureCli
+
+            $repo = Get-AzurePipelineRepositoryName -AllowPositional
+            $repoType = Get-AzurePipelineRepositoryType
+            $name = Get-IlegnaOption -Parsed $parsed -Names @("name", "pipeline")
+            $definitions = @(Get-AzurePipelineDefinitions -Repository $repo -RepositoryType $repoType -Name $name)
+            $enabled = @(Select-AzureEnabledPipelineDefinitions -Definitions $definitions)
+            Write-AzurePipelineDefinitions -Definitions $enabled
+        }
+        { $_ -in @("trigger", "run", "start") } {
+            if ($hostName -ne "azure") { throw "Pipeline trigger is only implemented for Azure DevOps repositories." }
+            Assert-AzureCli
+
+            $pipeline = Resolve-AzurePipelineDefinition -AllowPositionalRepository
+            $azArgs = @("pipelines", "run", "--id", $pipeline.id)
+            $branch = Get-AzurePipelineBranch
+            if (-not [string]::IsNullOrWhiteSpace($branch)) { $azArgs += @("--branch", $branch) }
+
+            $variables = Get-IlegnaOption -Parsed $parsed -Names @("variables", "vars")
+            if (-not [string]::IsNullOrWhiteSpace($variables)) { $azArgs += @("--variables") + @($variables -split ",") }
+
+            $parameters = Get-IlegnaOption -Parsed $parsed -Names @("parameters", "params")
+            if (-not [string]::IsNullOrWhiteSpace($parameters)) { $azArgs += @("--parameters") + @($parameters -split ",") }
+
+            if (Test-IlegnaFlag -Parsed $parsed -Names @("open", "web")) { $azArgs += "--open" }
+            Write-IlegnaLine ("Queueing Azure pipeline {0} ({1})" -f $pipeline.id, $pipeline.name) Cyan
+            if (Test-IlegnaFlag -Parsed $parsed -Names @("dry-run", "whatif")) {
+                Write-IlegnaLine ("az {0}" -f ($azArgs -join " ")) DarkGray
+                return
+            }
+
+            az @azArgs
+        }
+        "approvals" {
+            Invoke-AzurePipelineApprovals
+        }
+        { $_ -in @("complete", "approve") } {
+            Invoke-AzurePipelineApprovals -Approve
+        }
         "list" {
             if ($hostName -eq "azure") {
                 if (Get-Command az -ErrorAction SilentlyContinue) { az pipelines runs list @InputArgs; return }
