@@ -2,14 +2,18 @@ $repoRoot = Join-Path $PSScriptRoot "..\.."
 $ilegnaPath = Join-Path $repoRoot "scripts\ilegna.ps1"
 $backupPath = Join-Path $repoRoot "scripts\config-backup.ps1"
 $pathProfilePath = Join-Path $repoRoot "home\dot_config\powershell\profile.d\20-path.ps1"
+$aiProfilePath = Join-Path $repoRoot "home\dot_config\powershell\profile.d\70-ai.ps1"
 $profileWrapperPath = Join-Path $repoRoot "home\dot_config\powershell\profile.d\80-ilegna.ps1"
+$opencodeRtkPluginPath = Join-Path $repoRoot "home\dot_config\opencode\plugins\rtk.ts"
 $content = Get-Content -Path $ilegnaPath -Raw
 $pathProfileContent = Get-Content -Path $pathProfilePath -Raw
+$aiProfileContent = Get-Content -Path $aiProfilePath -Raw
 $profileWrapperContent = Get-Content -Path $profileWrapperPath -Raw
+$opencodeRtkPluginContent = Get-Content -Path $opencodeRtkPluginPath -Raw
 
 Describe "ilegna command surface" {
     It "has valid PowerShell syntax" {
-        foreach ($path in @($ilegnaPath, $backupPath, $pathProfilePath, $profileWrapperPath)) {
+        foreach ($path in @($ilegnaPath, $backupPath, $pathProfilePath, $aiProfilePath, $profileWrapperPath)) {
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) | Out-Null
@@ -63,6 +67,32 @@ Describe "ilegna command surface" {
         $pathProfileContent | Should Match 'C:\\tools\\jira-cli'
     }
 
+    It "shows Jira timers with legacy US date strings" {
+        $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("windots-ilegna-" + [guid]::NewGuid().ToString("N"))
+        $timerRoot = Join-Path $tempRoot "ilegna"
+        $timerPath = Join-Path $timerRoot "work-timer.json"
+        $oldLocalAppData = $env:LOCALAPPDATA
+
+        try {
+            New-Item -ItemType Directory -Path $timerRoot -Force | Out-Null
+            [pscustomobject]@{
+                issue = "AL-1541"
+                description = "legacy timer"
+                startedAt = "06/23/2020 17:04:23"
+            } | ConvertTo-Json | Set-Content -Path $timerPath -Encoding UTF8
+
+            $env:LOCALAPPDATA = $tempRoot
+            $output = pwsh -NoProfile -File $ilegnaPath jira show AL-1541 2>&1
+            $LASTEXITCODE | Should Be 0
+            ($output | Out-String) | Should Match 'AL-1541 running for'
+            ($output | Out-String) | Should Match 'legacy timer'
+        }
+        finally {
+            $env:LOCALAPPDATA = $oldLocalAppData
+            Remove-Item -Path $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It "supports Azure pipeline discovery and triggers" {
         $content | Should Match 'Get-AzurePipelineRepositoryName'
         $content | Should Match '"pipelines", "list", "--repository"'
@@ -72,5 +102,12 @@ Describe "ilegna command surface" {
         $content | Should Match '"complete", "approve"'
         $content | Should Match '"devops", "invoke", "--area", "release", "--resource", "approvals"'
         $content | Should Match '"statusFilter=\$statusFilter"'
+    }
+
+    It "initializes RTK for OpenCode from PowerShell" {
+        $aiProfileContent | Should Match 'Initialize-RtkOpenCodeIntegration'
+        $aiProfileContent | Should Match 'rtk init -g --opencode'
+        $opencodeRtkPluginContent | Should Match 'rtk rewrite'
+        $opencodeRtkPluginContent | Should Match 'tool\.execute\.before'
     }
 }

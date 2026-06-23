@@ -214,6 +214,15 @@
             Required = $false
         },
         @{
+            Name = 'mise-tool-rtk'
+            Provider = 'mise'
+            PackageId = 'rtk'
+            VerifyCommand = 'rtk'
+            Modules = @('ai')
+            Modes = @('full')
+            Required = $false
+        },
+        @{
             Name = 'mise-tool-ripgrep'
             Provider = 'mise'
             PackageId = 'ripgrep'

@@ -19,6 +19,7 @@ $requiredFiles = @(
     "home/dot_gitconfig.tmpl",
     "home/dot_codex/config.toml.tmpl",
     "home/dot_config/opencode/opencode.json.tmpl",
+    "home/dot_config/opencode/plugins/rtk.ts",
     "home/dot_config/ai/AGENTS.md",
     "home/dot_config/ai/skills/manifest.toml",
     "home/dot_config/ai/skills/pr-workflow/SKILL.md",

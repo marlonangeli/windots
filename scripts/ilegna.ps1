@@ -61,21 +61,35 @@ function Split-IlegnaArgs {
     [CmdletBinding()]
     param([string[]]$InputArgs)
 
-    [string[]]$inputList = if ($null -eq $InputArgs) { @() } else { @($InputArgs) }
+    [string[]]$inputList = if ($null -eq $InputArgs) {
+        @() 
+    }
+    else {
+        @($InputArgs) 
+    }
     $positionals = New-Object System.Collections.Generic.List[string]
     $options = @{}
     $flags = New-Object System.Collections.Generic.HashSet[string]([System.StringComparer]::OrdinalIgnoreCase)
 
     for ($i = 0; $i -lt $inputList.Count; $i++) {
         $item = $inputList[$i]
-        if ([string]::IsNullOrWhiteSpace($item)) { continue }
+        if ([string]::IsNullOrWhiteSpace($item)) {
+            continue 
+        }
 
         $item = $item.ToString()
         if ($item.StartsWith("--")) {
             $name = $item.Substring(2)
-            if ([string]::IsNullOrWhiteSpace($name)) { continue }
+            if ([string]::IsNullOrWhiteSpace($name)) {
+                continue 
+            }
 
-            $next = if ($i + 1 -lt $inputList.Count) { $inputList[$i + 1].ToString() } else { $null }
+            $next = if ($i + 1 -lt $inputList.Count) {
+                $inputList[$i + 1].ToString() 
+            }
+            else {
+                $null 
+            }
             if ($next -and -not $next.StartsWith("-")) {
                 $options[$name] = $next
                 $i++
@@ -88,9 +102,16 @@ function Split-IlegnaArgs {
 
         if ($item.StartsWith("-") -and $item.Length -gt 1) {
             $name = $item.Substring(1)
-            if ([string]::IsNullOrWhiteSpace($name)) { continue }
+            if ([string]::IsNullOrWhiteSpace($name)) {
+                continue 
+            }
 
-            $next = if ($i + 1 -lt $inputList.Count) { $inputList[$i + 1].ToString() } else { $null }
+            $next = if ($i + 1 -lt $inputList.Count) {
+                $inputList[$i + 1].ToString() 
+            }
+            else {
+                $null 
+            }
             if ($next -and -not $next.StartsWith("-")) {
                 $options[$name] = $next
                 $i++
@@ -120,7 +141,9 @@ function Get-IlegnaOption {
     )
 
     foreach ($name in $Names) {
-        if ($Parsed.Options.ContainsKey($name)) { return $Parsed.Options[$name] }
+        if ($Parsed.Options.ContainsKey($name)) {
+            return $Parsed.Options[$name] 
+        }
     }
 
     return $Default
@@ -134,7 +157,9 @@ function Test-IlegnaFlag {
     )
 
     foreach ($name in $Names) {
-        if ($Parsed.Flags.Contains($name)) { return $true }
+        if ($Parsed.Flags.Contains($name)) {
+            return $true 
+        }
     }
 
     return $false
@@ -145,10 +170,14 @@ function Assert-GitRepository {
     param()
 
     $inside = git rev-parse --is-inside-work-tree 2>$null
-    if ($LASTEXITCODE -eq 0 -and $inside -and $inside.Trim() -eq "true") { return }
+    if ($LASTEXITCODE -eq 0 -and $inside -and $inside.Trim() -eq "true") {
+        return 
+    }
 
     $bare = git rev-parse --is-bare-repository 2>$null
-    if ($LASTEXITCODE -eq 0 -and $bare -and $bare.Trim() -eq "true") { return }
+    if ($LASTEXITCODE -eq 0 -and $bare -and $bare.Trim() -eq "true") {
+        return 
+    }
 
     throw "Not inside a git repository."
 }
@@ -161,7 +190,9 @@ function Get-GitRoot {
     $root = git rev-parse --show-toplevel 2>$null
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($root)) {
         $bareRoot = Get-GitBareRepositoryPathOrNull
-        if (-not [string]::IsNullOrWhiteSpace($bareRoot)) { return $bareRoot }
+        if (-not [string]::IsNullOrWhiteSpace($bareRoot)) {
+            return $bareRoot 
+        }
         throw "Unable to resolve git root."
     }
 
@@ -178,7 +209,9 @@ function Get-DefaultBranch {
     }
 
     git show-ref --verify --quiet refs/heads/main
-    if ($LASTEXITCODE -eq 0) { return "main" }
+    if ($LASTEXITCODE -eq 0) {
+        return "main" 
+    }
 
     return "master"
 }
@@ -200,10 +233,16 @@ function Get-RepositoryHost {
     param()
 
     $remote = git remote get-url origin 2>$null
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($remote)) { return "unknown" }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($remote)) {
+        return "unknown" 
+    }
 
-    if ($remote -match 'dev\.azure\.com|\.visualstudio\.com|azuredevops') { return "azure" }
-    if ($remote -match 'github\.com[:/]') { return "github" }
+    if ($remote -match 'dev\.azure\.com|\.visualstudio\.com|azuredevops') {
+        return "azure" 
+    }
+    if ($remote -match 'github\.com[:/]') {
+        return "github" 
+    }
     return "unknown"
 }
 
@@ -221,10 +260,14 @@ function Resolve-GitBareRepositoryPath {
 
     if (-not [string]::IsNullOrWhiteSpace($Path)) {
         $resolved = Resolve-Path -LiteralPath $Path -ErrorAction SilentlyContinue
-        if (-not $resolved) { throw "Bare repo path not found: $Path" }
+        if (-not $resolved) {
+            throw "Bare repo path not found: $Path" 
+        }
 
         $candidate = $resolved.ProviderPath
-        if (-not (Test-GitBareRepositoryPath -Path $candidate)) { throw "Path is not a bare git repository: $candidate" }
+        if (-not (Test-GitBareRepositoryPath -Path $candidate)) {
+            throw "Path is not a bare git repository: $candidate" 
+        }
         return $candidate
     }
 
@@ -234,8 +277,12 @@ function Resolve-GitBareRepositoryPath {
         if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($gitDir)) {
             $candidate = $gitDir.Trim()
             $resolved = Resolve-Path -LiteralPath $candidate -ErrorAction SilentlyContinue
-            if ($resolved) { $candidate = $resolved.ProviderPath }
-            if (Test-GitBareRepositoryPath -Path $candidate) { return $candidate }
+            if ($resolved) {
+                $candidate = $resolved.ProviderPath 
+            }
+            if (Test-GitBareRepositoryPath -Path $candidate) {
+                return $candidate 
+            }
         }
     }
 
@@ -250,8 +297,12 @@ function Resolve-GitBareRepositoryPath {
             }
         }
 
-        if ($resolved) { $candidate = $resolved.ProviderPath }
-        if (Test-GitBareRepositoryPath -Path $candidate) { return $candidate }
+        if ($resolved) {
+            $candidate = $resolved.ProviderPath 
+        }
+        if (Test-GitBareRepositoryPath -Path $candidate) {
+            return $candidate 
+        }
     }
 
     throw "Unable to resolve a bare repository. Run from a bare-backed worktree or pass --path <bare-repo>."
@@ -279,12 +330,16 @@ function Get-GitBareDefaultBranch {
     $remoteHead = git --git-dir $RepoPath ls-remote --symref $Remote HEAD 2>$null
     if ($LASTEXITCODE -eq 0) {
         foreach ($line in @($remoteHead)) {
-            if ($line -match '^ref:\s+refs/heads/(.+)\s+HEAD$') { return $Matches[1] }
+            if ($line -match '^ref:\s+refs/heads/(.+)\s+HEAD$') {
+                return $Matches[1] 
+            }
         }
     }
 
     $localHead = git --git-dir $RepoPath symbolic-ref --short HEAD 2>$null
-    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($localHead)) { return $localHead.Trim() }
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($localHead)) {
+        return $localHead.Trim() 
+    }
 
     return "main"
 }
@@ -302,8 +357,12 @@ function Get-GitBareSelectedBranch {
         $branch = @($Parsed.Positionals | Where-Object { $_ -ne "all" } | Select-Object -First 1) | Select-Object -First 1
     }
 
-    if ([string]::IsNullOrWhiteSpace($branch)) { $branch = Get-GitBareDefaultBranch -RepoPath $RepoPath -Remote $Remote }
-    if ([string]::IsNullOrWhiteSpace($branch)) { throw "Unable to resolve branch. Pass <branch> or --branch <name>." }
+    if ([string]::IsNullOrWhiteSpace($branch)) {
+        $branch = Get-GitBareDefaultBranch -RepoPath $RepoPath -Remote $Remote 
+    }
+    if ([string]::IsNullOrWhiteSpace($branch)) {
+        throw "Unable to resolve branch. Pass <branch> or --branch <name>." 
+    }
 
     return $branch
 }
@@ -316,7 +375,9 @@ function Get-GitBareRemoteHeads {
     )
 
     $lines = git --git-dir $RepoPath ls-remote --heads $Remote 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "Unable to query remote heads from '$Remote'." }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to query remote heads from '$Remote'." 
+    }
 
     $heads = foreach ($line in @($lines)) {
         if ($line -match '^([0-9a-fA-F]+)\s+refs/heads/(.+)$') {
@@ -340,10 +401,14 @@ function Get-GitBareRemoteBranchSha {
 
     $escapedBranch = [regex]::Escape($Branch)
     $lines = git --git-dir $RepoPath ls-remote --heads $Remote $Branch 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "Unable to query remote branch '$Branch' from '$Remote'." }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to query remote branch '$Branch' from '$Remote'." 
+    }
 
     foreach ($line in @($lines)) {
-        if ($line -match "^([0-9a-fA-F]+)\s+refs/heads/$escapedBranch$") { return $Matches[1] }
+        if ($line -match "^([0-9a-fA-F]+)\s+refs/heads/$escapedBranch$") {
+            return $Matches[1] 
+        }
     }
 
     return $null
@@ -357,7 +422,9 @@ function Get-GitBareLocalBranchSha {
     )
 
     $sha = git --git-dir $RepoPath rev-parse --verify "refs/heads/$Branch" 2>$null
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sha)) { return $null }
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($sha)) {
+        return $null 
+    }
 
     return $sha.Trim()
 }
@@ -389,9 +456,27 @@ function Write-GitBareBranchStatus {
         "stale"
     }
 
-    $color = if ($state -eq "up-to-date") { [ConsoleColor]::Green } elseif ($state -eq "stale") { [ConsoleColor]::Yellow } else { [ConsoleColor]::Red }
-    $localText = if ([string]::IsNullOrWhiteSpace($localSha)) { "<missing>" } else { $localSha }
-    $remoteText = if ([string]::IsNullOrWhiteSpace($RemoteSha)) { "<missing>" } else { $RemoteSha }
+    $color = if ($state -eq "up-to-date") {
+        [ConsoleColor]::Green 
+    }
+    elseif ($state -eq "stale") {
+        [ConsoleColor]::Yellow 
+    }
+    else {
+        [ConsoleColor]::Red 
+    }
+    $localText = if ([string]::IsNullOrWhiteSpace($localSha)) {
+        "<missing>" 
+    }
+    else {
+        $localSha 
+    }
+    $remoteText = if ([string]::IsNullOrWhiteSpace($RemoteSha)) {
+        "<missing>" 
+    }
+    else {
+        $RemoteSha 
+    }
     Write-IlegnaLine ("{0} local={1} remote={2} {3}" -f $Branch, $localText, $remoteText, $state) $color
 }
 
@@ -420,7 +505,9 @@ function Get-GitBareLocalBranches {
     param([Parameter(Mandatory)][string]$RepoPath)
 
     $branches = git --git-dir $RepoPath for-each-ref --format="%(refname:short)" refs/heads 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "Unable to list local branches in '$RepoPath'." }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to list local branches in '$RepoPath'." 
+    }
 
     return @($branches | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
@@ -445,19 +532,25 @@ function Sync-GitBareBranch {
         }
 
         git @worktreeArgs
-        if ($LASTEXITCODE -ne 0) { throw "git worktree sync failed for '$Branch'." }
+        if ($LASTEXITCODE -ne 0) {
+            throw "git worktree sync failed for '$Branch'." 
+        }
         return
     }
 
     $refspec = "+refs/heads/${Branch}:refs/heads/${Branch}"
     $fetchArgs = @("--git-dir", $RepoPath, "fetch", "--prune")
-    if ($DryRun) { $fetchArgs += "--dry-run" }
+    if ($DryRun) {
+        $fetchArgs += "--dry-run" 
+    }
     $fetchArgs += $Remote
     $fetchArgs += $refspec
 
     Write-IlegnaLine "Syncing bare branch '$Branch'" Cyan
     git @fetchArgs
-    if ($LASTEXITCODE -ne 0) { throw "git fetch failed for '$Branch'." }
+    if ($LASTEXITCODE -ne 0) {
+        throw "git fetch failed for '$Branch'." 
+    }
 }
 
 function Sync-GitBareTags {
@@ -469,13 +562,17 @@ function Sync-GitBareTags {
     )
 
     $fetchArgs = @("--git-dir", $RepoPath, "fetch", "--prune", "--prune-tags")
-    if ($DryRun) { $fetchArgs += "--dry-run" }
+    if ($DryRun) {
+        $fetchArgs += "--dry-run" 
+    }
     $fetchArgs += $Remote
     $fetchArgs += "+refs/tags/*:refs/tags/*"
 
     Write-IlegnaLine "Syncing bare tags" Cyan
     git @fetchArgs
-    if ($LASTEXITCODE -ne 0) { throw "git tag fetch failed." }
+    if ($LASTEXITCODE -ne 0) {
+        throw "git tag fetch failed." 
+    }
 }
 
 function Remove-GitBareDeletedBranches {
@@ -488,22 +585,35 @@ function Remove-GitBareDeletedBranches {
     )
 
     $remoteBranchSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
-    foreach ($head in $RemoteHeads) { $remoteBranchSet.Add($head.Branch) | Out-Null }
+    foreach ($head in $RemoteHeads) {
+        $remoteBranchSet.Add($head.Branch) | Out-Null 
+    }
 
     foreach ($branch in Get-GitBareLocalBranches -RepoPath $RepoPath) {
-        if ($remoteBranchSet.Contains($branch)) { continue }
+        if ($remoteBranchSet.Contains($branch)) {
+            continue 
+        }
 
         if ($WorktreeBranches.ContainsKey($branch)) {
             Write-IlegnaLine "Skipping prune for checked-out branch '$branch' at '$($WorktreeBranches[$branch])'" Yellow
             continue
         }
 
-        $message = if ($DryRun) { "Would prune local branch '$branch'" } else { "Pruning local branch '$branch'" }
+        $message = if ($DryRun) {
+            "Would prune local branch '$branch'" 
+        }
+        else {
+            "Pruning local branch '$branch'" 
+        }
         Write-IlegnaLine $message Yellow
-        if ($DryRun) { continue }
+        if ($DryRun) {
+            continue 
+        }
 
         git --git-dir $RepoPath update-ref -d "refs/heads/$branch"
-        if ($LASTEXITCODE -ne 0) { throw "Unable to prune local branch '$branch'." }
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to prune local branch '$branch'." 
+        }
     }
 }
 
@@ -514,7 +624,9 @@ function Invoke-IlegnaGitBare {
         [string[]]$InputArgs
     )
 
-    if ([string]::IsNullOrWhiteSpace($Subcommand)) { $Subcommand = "status" }
+    if ([string]::IsNullOrWhiteSpace($Subcommand)) {
+        $Subcommand = "status" 
+    }
     $parsed = Split-IlegnaArgs -InputArgs $InputArgs
     $repoPath = Resolve-GitBareRepositoryPath -Path (Get-IlegnaOption -Parsed $parsed -Names @("path", "repo", "git-dir", "bare"))
     $remote = Get-IlegnaOption -Parsed $parsed -Names @("remote", "r") -Default "origin"
@@ -533,7 +645,12 @@ function Invoke-IlegnaGitBare {
                 Write-IlegnaLine "Syncing bare repo '$repoPath' from '$remote' (all branches)" Cyan
                 $heads = Get-GitBareRemoteHeads -RepoPath $repoPath -Remote $remote
                 foreach ($head in @($heads | Sort-Object Branch)) {
-                    $worktreePath = if ($worktreeBranches.ContainsKey($head.Branch)) { $worktreeBranches[$head.Branch] } else { $null }
+                    $worktreePath = if ($worktreeBranches.ContainsKey($head.Branch)) {
+                        $worktreeBranches[$head.Branch] 
+                    }
+                    else {
+                        $null 
+                    }
                     Sync-GitBareBranch -RepoPath $repoPath -Remote $remote -Branch $head.Branch -WorktreePath $worktreePath -DryRun:$dryRun
                 }
 
@@ -541,14 +658,23 @@ function Invoke-IlegnaGitBare {
             }
             else {
                 $branch = Get-GitBareSelectedBranch -Parsed $parsed -RepoPath $repoPath -Remote $remote
-                $worktreePath = if ($worktreeBranches.ContainsKey($branch)) { $worktreeBranches[$branch] } else { $null }
+                $worktreePath = if ($worktreeBranches.ContainsKey($branch)) {
+                    $worktreeBranches[$branch] 
+                }
+                else {
+                    $null 
+                }
                 Write-IlegnaLine "Syncing bare repo '$repoPath' from '$remote' (branch '$branch')" Cyan
                 Sync-GitBareBranch -RepoPath $repoPath -Remote $remote -Branch $branch -WorktreePath $worktreePath -DryRun:$dryRun
             }
 
-            if ($syncTags) { Sync-GitBareTags -RepoPath $repoPath -Remote $remote -DryRun:$dryRun }
+            if ($syncTags) {
+                Sync-GitBareTags -RepoPath $repoPath -Remote $remote -DryRun:$dryRun 
+            }
 
-            if ($dryRun) { Write-IlegnaLine "Dry-run complete." Yellow; return }
+            if ($dryRun) {
+                Write-IlegnaLine "Dry-run complete." Yellow; return 
+            }
             Write-IlegnaLine "Bare repo refs synced." Green
         }
         { $_ -in @("status", "verify", "check") } {
@@ -557,7 +683,9 @@ function Invoke-IlegnaGitBare {
 
             if ($all) {
                 $heads = Get-GitBareRemoteHeads -RepoPath $repoPath -Remote $remote
-                if (-not $heads) { Write-IlegnaLine "No remote heads found." Yellow; return }
+                if (-not $heads) {
+                    Write-IlegnaLine "No remote heads found." Yellow; return 
+                }
                 foreach ($head in @($heads | Sort-Object Branch)) {
                     Write-GitBareBranchStatus -RepoPath $repoPath -Remote $remote -Branch $head.Branch -RemoteSha $head.Sha
                 }
@@ -584,7 +712,9 @@ function Get-WorktreePathByBranch {
     $currentBranch = $null
     foreach ($line in git worktree list --porcelain) {
         if ($line -match '^worktree\s+(.+)$') {
-            if ($currentPath -and $currentBranch -eq $Branch) { return $currentPath }
+            if ($currentPath -and $currentBranch -eq $Branch) {
+                return $currentPath 
+            }
             $currentPath = $Matches[1]
             $currentBranch = $null
             continue
@@ -595,7 +725,9 @@ function Get-WorktreePathByBranch {
         }
     }
 
-    if ($currentPath -and $currentBranch -eq $Branch) { return $currentPath }
+    if ($currentPath -and $currentBranch -eq $Branch) {
+        return $currentPath 
+    }
     return $null
 }
 
@@ -611,7 +743,9 @@ function Get-DefaultWorktreeParent {
     param()
 
     $bareRoot = Get-GitBareRepositoryPathOrNull
-    if (-not [string]::IsNullOrWhiteSpace($bareRoot)) { return $bareRoot }
+    if (-not [string]::IsNullOrWhiteSpace($bareRoot)) {
+        return $bareRoot 
+    }
 
     return (Join-Path (Get-GitRoot) ".worktrees")
 }
@@ -623,7 +757,12 @@ function Get-DefaultWorktreePath {
         [switch]$CurrentDirectory
     )
 
-    $parent = if ($CurrentDirectory) { (Get-Location).ProviderPath } else { Get-DefaultWorktreeParent }
+    $parent = if ($CurrentDirectory) {
+        (Get-Location).ProviderPath 
+    }
+    else {
+        Get-DefaultWorktreeParent 
+    }
     return (Join-Path $parent (Convert-BranchToWorktreeName -Branch $Branch))
 }
 
@@ -632,7 +771,9 @@ function Resolve-WorktreePathInput {
     param([Parameter(Mandatory)][string]$Path)
 
     $expanded = $ExecutionContext.InvokeCommand.ExpandString($Path)
-    if ([System.IO.Path]::IsPathRooted($expanded)) { return $expanded }
+    if ([System.IO.Path]::IsPathRooted($expanded)) {
+        return $expanded 
+    }
 
     return (Join-Path (Get-Location).ProviderPath $expanded)
 }
@@ -644,9 +785,16 @@ function Read-IlegnaPrompt {
         [string]$Default
     )
 
-    $label = if ([string]::IsNullOrWhiteSpace($Default)) { $Prompt } else { "$Prompt [$Default]" }
+    $label = if ([string]::IsNullOrWhiteSpace($Default)) {
+        $Prompt 
+    }
+    else {
+        "$Prompt [$Default]" 
+    }
     $value = Read-Host $label
-    if ([string]::IsNullOrWhiteSpace($value)) { return $Default }
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        return $Default 
+    }
     return $value.Trim()
 }
 
@@ -657,9 +805,16 @@ function Read-IlegnaYesNo {
         [bool]$Default = $true
     )
 
-    $suffix = if ($Default) { "Y/n" } else { "y/N" }
+    $suffix = if ($Default) {
+        "Y/n" 
+    }
+    else {
+        "y/N" 
+    }
     $value = Read-Host "$Prompt [$suffix]"
-    if ([string]::IsNullOrWhiteSpace($value)) { return $Default }
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        return $Default 
+    }
 
     return ($value.Trim().ToLowerInvariant() -in @("y", "yes", "s", "sim"))
 }
@@ -669,10 +824,14 @@ function Resolve-WorktreeBaseRef {
     param([Parameter(Mandatory)][string]$Base)
 
     git fetch origin $Base *> $null
-    if ($LASTEXITCODE -eq 0) { return "FETCH_HEAD" }
+    if ($LASTEXITCODE -eq 0) {
+        return "FETCH_HEAD" 
+    }
 
     git rev-parse --verify "$Base^{commit}" *> $null
-    if ($LASTEXITCODE -eq 0) { return $Base }
+    if ($LASTEXITCODE -eq 0) {
+        return $Base 
+    }
 
     throw "Unable to resolve base ref: $Base"
 }
@@ -684,7 +843,9 @@ function Invoke-IlegnaWorktree {
         [string[]]$InputArgs
     )
 
-    if ([string]::IsNullOrWhiteSpace($Subcommand)) { $Subcommand = "list" }
+    if ([string]::IsNullOrWhiteSpace($Subcommand)) {
+        $Subcommand = "list" 
+    }
     $parsed = Split-IlegnaArgs -InputArgs $InputArgs
 
     switch ($Subcommand.ToLowerInvariant()) {
@@ -701,10 +862,14 @@ function Invoke-IlegnaWorktree {
                 $branch = Read-IlegnaPrompt -Prompt "Branch"
             }
 
-            if ([string]::IsNullOrWhiteSpace($branch)) { throw "Usage: ilegna wt new <branch> [--base main] [--path .worktrees/name] [--cd] or ilegna wt new -i" }
+            if ([string]::IsNullOrWhiteSpace($branch)) {
+                throw "Usage: ilegna wt new <branch> [--base main] [--path .worktrees/name] [--cd] or ilegna wt new -i" 
+            }
 
             git check-ref-format --branch $branch *> $null
-            if ($LASTEXITCODE -ne 0) { throw "Invalid branch name: $branch" }
+            if ($LASTEXITCODE -ne 0) {
+                throw "Invalid branch name: $branch" 
+            }
 
             $base = Get-IlegnaOption -Parsed $parsed -Names @("base", "b") -Default (Get-DefaultBranch)
             $path = Get-IlegnaOption -Parsed $parsed -Names @("path", "location", "name")
@@ -728,24 +893,39 @@ function Invoke-IlegnaWorktree {
                 New-Item -ItemType Directory -Path $parent -Force | Out-Null
             }
 
-            if (Test-Path $path) { throw "Worktree path already exists: $path" }
+            if (Test-Path $path) {
+                throw "Worktree path already exists: $path" 
+            }
 
             Write-IlegnaLine "Creating worktree '$branch' from '$base'" Cyan
             $baseRef = Resolve-WorktreeBaseRef -Base $base
 
             git worktree add $path -b $branch $baseRef
-            if ($LASTEXITCODE -ne 0) { throw "git worktree add failed." }
+            if ($LASTEXITCODE -ne 0) {
+                throw "git worktree add failed." 
+            }
 
             Write-IlegnaLine "Worktree ready: $path" Green
-            if ($cdAfter) { Set-Location $path }
+            if ($cdAfter) {
+                Set-Location $path 
+            }
         }
         "remove" {
             Assert-GitRepository
             $target = $parsed.Positionals | Select-Object -First 1
-            if ([string]::IsNullOrWhiteSpace($target)) { throw "Usage: ilegna wt remove <branch-or-path> [--force]" }
+            if ([string]::IsNullOrWhiteSpace($target)) {
+                throw "Usage: ilegna wt remove <branch-or-path> [--force]" 
+            }
 
-            $path = if (Test-Path $target) { $target } else { Get-WorktreePathByBranch -Branch $target }
-            if ([string]::IsNullOrWhiteSpace($path)) { throw "Worktree not found: $target" }
+            $path = if (Test-Path $target) {
+                $target 
+            }
+            else {
+                Get-WorktreePathByBranch -Branch $target 
+            }
+            if ([string]::IsNullOrWhiteSpace($path)) {
+                throw "Worktree not found: $target" 
+            }
 
             $force = Test-IlegnaFlag -Parsed $parsed -Names @("force", "f")
             $status = git -C $path status --porcelain 2>$null
@@ -756,17 +936,30 @@ function Invoke-IlegnaWorktree {
             }
 
             $removeArgs = @("worktree", "remove", $path)
-            if ($force) { $removeArgs += "--force" }
+            if ($force) {
+                $removeArgs += "--force" 
+            }
             git @removeArgs
-            if ($LASTEXITCODE -ne 0) { throw "git worktree remove failed." }
+            if ($LASTEXITCODE -ne 0) {
+                throw "git worktree remove failed." 
+            }
         }
         { $_ -in @("open", "cd") } {
             Assert-GitRepository
             $target = $parsed.Positionals | Select-Object -First 1
-            if ([string]::IsNullOrWhiteSpace($target)) { throw "Usage: ilegna wt open <branch-or-path>" }
+            if ([string]::IsNullOrWhiteSpace($target)) {
+                throw "Usage: ilegna wt open <branch-or-path>" 
+            }
 
-            $path = if (Test-Path $target) { $target } else { Get-WorktreePathByBranch -Branch $target }
-            if ([string]::IsNullOrWhiteSpace($path)) { throw "Worktree not found: $target" }
+            $path = if (Test-Path $target) {
+                $target 
+            }
+            else {
+                Get-WorktreePathByBranch -Branch $target 
+            }
+            if ([string]::IsNullOrWhiteSpace($path)) {
+                throw "Worktree not found: $target" 
+            }
             Set-Location $path
         }
         "status" {
@@ -797,7 +990,9 @@ function Invoke-IlegnaPullRequest {
         [string[]]$InputArgs
     )
 
-    if ([string]::IsNullOrWhiteSpace($Subcommand)) { $Subcommand = "list" }
+    if ([string]::IsNullOrWhiteSpace($Subcommand)) {
+        $Subcommand = "list" 
+    }
     $parsed = Split-IlegnaArgs -InputArgs $InputArgs
 
     function Assert-AzureCli {
@@ -808,7 +1003,9 @@ function Invoke-IlegnaPullRequest {
 
     function Get-PullRequestId {
         $id = Get-IlegnaOption -Parsed $parsed -Names @("id", "pr")
-        if (-not [string]::IsNullOrWhiteSpace($id)) { return $id }
+        if (-not [string]::IsNullOrWhiteSpace($id)) {
+            return $id 
+        }
         return ($parsed.Positionals | Select-Object -First 1)
     }
 
@@ -822,11 +1019,17 @@ function Invoke-IlegnaPullRequest {
             $body = Get-IlegnaOption -Parsed $parsed -Names @("body")
             $draft = -not (Test-IlegnaFlag -Parsed $parsed -Names @("ready", "no-draft"))
             $currentBranch = Get-CurrentBranch
-            if ([string]::IsNullOrWhiteSpace($currentBranch)) { throw "Unable to resolve current branch." }
+            if ([string]::IsNullOrWhiteSpace($currentBranch)) {
+                throw "Unable to resolve current branch." 
+            }
 
-            if ([string]::IsNullOrWhiteSpace($title)) { $title = $currentBranch }
+            if ([string]::IsNullOrWhiteSpace($title)) {
+                $title = $currentBranch 
+            }
             $azArgs = @("repos", "pr", "create", "--source-branch", $currentBranch, "--target-branch", $base, "--title", $title, "--draft", $draft.ToString().ToLowerInvariant())
-            if ($body) { $azArgs += @("--description", $body) }
+            if ($body) {
+                $azArgs += @("--description", $body) 
+            }
             az @azArgs
         }
         "list" {
@@ -836,16 +1039,22 @@ function Invoke-IlegnaPullRequest {
         { $_ -in @("view", "show", "open") } {
             Assert-AzureCli
             $id = Get-PullRequestId
-            if ([string]::IsNullOrWhiteSpace($id)) { throw "Usage: ilegna pr view <id> [--open]" }
+            if ([string]::IsNullOrWhiteSpace($id)) {
+                throw "Usage: ilegna pr view <id> [--open]" 
+            }
 
             $azArgs = @("repos", "pr", "show", "--id", $id)
-            if ($Subcommand.ToLowerInvariant() -eq "open" -or (Test-IlegnaFlag -Parsed $parsed -Names @("open", "web"))) { $azArgs += "--open" }
+            if ($Subcommand.ToLowerInvariant() -eq "open" -or (Test-IlegnaFlag -Parsed $parsed -Names @("open", "web"))) {
+                $azArgs += "--open" 
+            }
             az @azArgs
         }
         "checkout" {
             Assert-AzureCli
             $id = Get-PullRequestId
-            if ([string]::IsNullOrWhiteSpace($id)) { throw "Usage: ilegna pr checkout <id>" }
+            if ([string]::IsNullOrWhiteSpace($id)) {
+                throw "Usage: ilegna pr checkout <id>" 
+            }
             az repos pr checkout --id $id
         }
         default {
@@ -861,7 +1070,9 @@ function Invoke-IlegnaPipeline {
         [string[]]$InputArgs
     )
 
-    if ([string]::IsNullOrWhiteSpace($Subcommand)) { $Subcommand = "list" }
+    if ([string]::IsNullOrWhiteSpace($Subcommand)) {
+        $Subcommand = "list" 
+    }
     $hostName = Get-RepositoryHost
     $parsed = Split-IlegnaArgs -InputArgs $InputArgs
 
@@ -873,25 +1084,37 @@ function Invoke-IlegnaPipeline {
 
     function Get-PipelineRunId {
         $id = Get-IlegnaOption -Parsed $parsed -Names @("id", "run")
-        if (-not [string]::IsNullOrWhiteSpace($id)) { return $id }
+        if (-not [string]::IsNullOrWhiteSpace($id)) {
+            return $id 
+        }
         return ($parsed.Positionals | Select-Object -First 1)
     }
 
     function Get-AzureDevOpsRemoteUrl {
         $remote = git remote get-url origin 2>$null
-        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($remote)) { return $remote.Trim() }
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($remote)) {
+            return $remote.Trim() 
+        }
         return $null
     }
 
     function Get-AzureDevOpsProjectName {
         $project = Get-IlegnaOption -Parsed $parsed -Names @("project", "p")
-        if (-not [string]::IsNullOrWhiteSpace($project)) { return $project }
+        if (-not [string]::IsNullOrWhiteSpace($project)) {
+            return $project 
+        }
 
         $remote = Get-AzureDevOpsRemoteUrl
-        if ([string]::IsNullOrWhiteSpace($remote)) { return $null }
+        if ([string]::IsNullOrWhiteSpace($remote)) {
+            return $null 
+        }
 
-        if ($remote -match '/([^/]+)/_git/[^/]+/?$') { return [uri]::UnescapeDataString($Matches[1]) }
-        if ($remote -match '/v3/[^/]+/([^/]+)/[^/]+/?$') { return [uri]::UnescapeDataString($Matches[1]) }
+        if ($remote -match '/([^/]+)/_git/[^/]+/?$') {
+            return [uri]::UnescapeDataString($Matches[1]) 
+        }
+        if ($remote -match '/v3/[^/]+/([^/]+)/[^/]+/?$') {
+            return [uri]::UnescapeDataString($Matches[1]) 
+        }
         return $null
     }
 
@@ -903,13 +1126,21 @@ function Invoke-IlegnaPipeline {
             $repo = $parsed.Positionals | Select-Object -First 1
         }
 
-        if (-not [string]::IsNullOrWhiteSpace($repo)) { return $repo }
+        if (-not [string]::IsNullOrWhiteSpace($repo)) {
+            return $repo 
+        }
 
         $remote = Get-AzureDevOpsRemoteUrl
-        if ([string]::IsNullOrWhiteSpace($remote)) { throw "Unable to resolve repository. Pass --repo <name>." }
+        if ([string]::IsNullOrWhiteSpace($remote)) {
+            throw "Unable to resolve repository. Pass --repo <name>." 
+        }
 
-        if ($remote -match '/_git/([^/]+?)(?:\.git)?/?$') { return [uri]::UnescapeDataString($Matches[1]) }
-        if ($remote -match '/v3/[^/]+/[^/]+/([^/]+?)(?:\.git)?/?$') { return [uri]::UnescapeDataString($Matches[1]) }
+        if ($remote -match '/_git/([^/]+?)(?:\.git)?/?$') {
+            return [uri]::UnescapeDataString($Matches[1]) 
+        }
+        if ($remote -match '/v3/[^/]+/[^/]+/([^/]+?)(?:\.git)?/?$') {
+            return [uri]::UnescapeDataString($Matches[1]) 
+        }
         throw "Unable to resolve Azure repository from origin. Pass --repo <name>."
     }
 
@@ -925,11 +1156,17 @@ function Invoke-IlegnaPipeline {
         )
 
         $azArgs = @("pipelines", "list", "--repository", $Repository, "--repository-type", $RepositoryType, "--query-order", "ModifiedDesc", "-o", "json")
-        if (-not [string]::IsNullOrWhiteSpace($Name)) { $azArgs += @("--name", $Name) }
+        if (-not [string]::IsNullOrWhiteSpace($Name)) {
+            $azArgs += @("--name", $Name) 
+        }
 
         $json = az @azArgs
-        if ($LASTEXITCODE -ne 0) { throw "Unable to list Azure pipelines for repository '$Repository'." }
-        if ([string]::IsNullOrWhiteSpace(($json | Out-String))) { return @() }
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unable to list Azure pipelines for repository '$Repository'." 
+        }
+        if ([string]::IsNullOrWhiteSpace(($json | Out-String))) {
+            return @() 
+        }
 
         $definitions = ($json | Out-String) | ConvertFrom-Json
         return @($definitions)
@@ -942,7 +1179,9 @@ function Invoke-IlegnaPipeline {
         foreach ($definition in @($Definitions)) {
             $hasEnabledStatus = $definition.queueStatus -eq "enabled" -or $definition.status -eq "enabled"
             $hasNoStatus = [string]::IsNullOrWhiteSpace($definition.queueStatus) -and [string]::IsNullOrWhiteSpace($definition.status)
-            if ($hasEnabledStatus -or $hasNoStatus) { $enabled += $definition }
+            if ($hasEnabledStatus -or $hasNoStatus) {
+                $enabled += $definition 
+            }
         }
 
         return @($enabled)
@@ -965,9 +1204,27 @@ function Invoke-IlegnaPipeline {
                 }
             }
 
-            $status = if ($details.queueStatus) { $details.queueStatus } elseif ($details.status) { $details.status } else { "unknown" }
-            $repo = if ($details.repository.name) { $details.repository.name } else { "unknown" }
-            $yaml = if ($details.process.yamlFilename) { $details.process.yamlFilename } else { "<classic>" }
+            $status = if ($details.queueStatus) {
+                $details.queueStatus 
+            }
+            elseif ($details.status) {
+                $details.status 
+            }
+            else {
+                "unknown" 
+            }
+            $repo = if ($details.repository.name) {
+                $details.repository.name 
+            }
+            else {
+                "unknown" 
+            }
+            $yaml = if ($details.process.yamlFilename) {
+                $details.process.yamlFilename 
+            }
+            else {
+                "<classic>" 
+            }
             Write-IlegnaLine ("{0} {1} status={2} repo={3} yaml={4}" -f $details.id, $details.name, $status, $repo, $yaml) Cyan
         }
     }
@@ -978,7 +1235,9 @@ function Invoke-IlegnaPipeline {
         $id = Get-IlegnaOption -Parsed $parsed -Names @("id", "pipeline-id")
         if (-not [string]::IsNullOrWhiteSpace($id)) {
             $json = az pipelines show --id $id -o json
-            if ($LASTEXITCODE -ne 0) { throw "Unable to resolve Azure pipeline id '$id'." }
+            if ($LASTEXITCODE -ne 0) {
+                throw "Unable to resolve Azure pipeline id '$id'." 
+            }
             return (($json | Out-String) | ConvertFrom-Json)
         }
 
@@ -1003,10 +1262,14 @@ function Invoke-IlegnaPipeline {
 
     function Get-AzurePipelineBranch {
         $branch = Get-IlegnaOption -Parsed $parsed -Names @("branch", "b")
-        if (-not [string]::IsNullOrWhiteSpace($branch)) { return $branch }
+        if (-not [string]::IsNullOrWhiteSpace($branch)) {
+            return $branch 
+        }
 
         $currentBranch = Get-CurrentBranch
-        if (-not [string]::IsNullOrWhiteSpace($currentBranch)) { return $currentBranch }
+        if (-not [string]::IsNullOrWhiteSpace($currentBranch)) {
+            return $currentBranch 
+        }
         return $null
     }
 
@@ -1022,14 +1285,20 @@ function Invoke-IlegnaPipeline {
 
         $apiVersion = Get-IlegnaOption -Parsed $parsed -Names @("api-version") -Default "7.0"
         $azArgs = @("devops", "invoke", "--area", "release", "--resource", "approvals", "--api-version", $apiVersion, "-o", "json")
-        if (-not [string]::IsNullOrWhiteSpace($project)) { $azArgs += @("--route-parameters", "project=$project") }
+        if (-not [string]::IsNullOrWhiteSpace($project)) {
+            $azArgs += @("--route-parameters", "project=$project") 
+        }
 
         if (-not $Approve -or [string]::IsNullOrWhiteSpace($approvalId)) {
             $statusFilter = Get-IlegnaOption -Parsed $parsed -Names @("status", "status-filter") -Default "pending"
             $listArgs = @($azArgs + @("--query-parameters", "statusFilter=$statusFilter"))
             az @listArgs
-            if ($LASTEXITCODE -ne 0) { throw "Unable to list Azure DevOps release approvals through az devops invoke." }
-            if ($Approve) { throw "Pass an approval id: ilegna pipeline complete --approval-id <id> [--comment <text>]" }
+            if ($LASTEXITCODE -ne 0) {
+                throw "Unable to list Azure DevOps release approvals through az devops invoke." 
+            }
+            if ($Approve) {
+                throw "Pass an approval id: ilegna pipeline complete --approval-id <id> [--comment <text>]" 
+            }
             return
         }
 
@@ -1051,7 +1320,9 @@ function Invoke-IlegnaPipeline {
         try {
             Set-Content -LiteralPath $tempFile.FullName -Value $payload -Encoding UTF8
             az @($patchArgs + @("--in-file", $tempFile.FullName))
-            if ($LASTEXITCODE -ne 0) { throw "Unable to update Azure DevOps release approval '$approvalId'." }
+            if ($LASTEXITCODE -ne 0) {
+                throw "Unable to update Azure DevOps release approval '$approvalId'." 
+            }
         }
         finally {
             Remove-Item -LiteralPath $tempFile.FullName -Force -ErrorAction SilentlyContinue
@@ -1060,7 +1331,9 @@ function Invoke-IlegnaPipeline {
 
     switch ($Subcommand.ToLowerInvariant()) {
         { $_ -in @("active", "definitions") } {
-            if ($hostName -ne "azure") { throw "Pipeline discovery by repository is only implemented for Azure DevOps repositories." }
+            if ($hostName -ne "azure") {
+                throw "Pipeline discovery by repository is only implemented for Azure DevOps repositories." 
+            }
             Assert-AzureCli
 
             $repo = Get-AzurePipelineRepositoryName -AllowPositional
@@ -1071,21 +1344,31 @@ function Invoke-IlegnaPipeline {
             Write-AzurePipelineDefinitions -Definitions $enabled
         }
         { $_ -in @("trigger", "run", "start") } {
-            if ($hostName -ne "azure") { throw "Pipeline trigger is only implemented for Azure DevOps repositories." }
+            if ($hostName -ne "azure") {
+                throw "Pipeline trigger is only implemented for Azure DevOps repositories." 
+            }
             Assert-AzureCli
 
             $pipeline = Resolve-AzurePipelineDefinition -AllowPositionalRepository
             $azArgs = @("pipelines", "run", "--id", $pipeline.id)
             $branch = Get-AzurePipelineBranch
-            if (-not [string]::IsNullOrWhiteSpace($branch)) { $azArgs += @("--branch", $branch) }
+            if (-not [string]::IsNullOrWhiteSpace($branch)) {
+                $azArgs += @("--branch", $branch) 
+            }
 
             $variables = Get-IlegnaOption -Parsed $parsed -Names @("variables", "vars")
-            if (-not [string]::IsNullOrWhiteSpace($variables)) { $azArgs += @("--variables") + @($variables -split ",") }
+            if (-not [string]::IsNullOrWhiteSpace($variables)) {
+                $azArgs += @("--variables") + @($variables -split ",") 
+            }
 
             $parameters = Get-IlegnaOption -Parsed $parsed -Names @("parameters", "params")
-            if (-not [string]::IsNullOrWhiteSpace($parameters)) { $azArgs += @("--parameters") + @($parameters -split ",") }
+            if (-not [string]::IsNullOrWhiteSpace($parameters)) {
+                $azArgs += @("--parameters") + @($parameters -split ",") 
+            }
 
-            if (Test-IlegnaFlag -Parsed $parsed -Names @("open", "web")) { $azArgs += "--open" }
+            if (Test-IlegnaFlag -Parsed $parsed -Names @("open", "web")) {
+                $azArgs += "--open" 
+            }
             Write-IlegnaLine ("Queueing Azure pipeline {0} ({1})" -f $pipeline.id, $pipeline.name) Cyan
             if (Test-IlegnaFlag -Parsed $parsed -Names @("dry-run", "whatif")) {
                 Write-IlegnaLine ("az {0}" -f ($azArgs -join " ")) DarkGray
@@ -1102,44 +1385,66 @@ function Invoke-IlegnaPipeline {
         }
         "list" {
             if ($hostName -eq "azure") {
-                if (Get-Command az -ErrorAction SilentlyContinue) { az pipelines runs list @InputArgs; return }
+                if (Get-Command az -ErrorAction SilentlyContinue) {
+                    az pipelines runs list @InputArgs; return 
+                }
                 throw "This looks like an Azure repo, but az was not found."
             }
             if ($hostName -eq "github") {
-                if (Get-Command gh -ErrorAction SilentlyContinue) { gh run list @InputArgs; return }
+                if (Get-Command gh -ErrorAction SilentlyContinue) {
+                    gh run list @InputArgs; return 
+                }
                 throw "This looks like a GitHub repo, but gh was not found."
             }
-            if (Get-Command gh -ErrorAction SilentlyContinue) { gh run list @InputArgs; return }
-            if (Get-Command az -ErrorAction SilentlyContinue) { az pipelines runs list @InputArgs; return }
+            if (Get-Command gh -ErrorAction SilentlyContinue) {
+                gh run list @InputArgs; return 
+            }
+            if (Get-Command az -ErrorAction SilentlyContinue) {
+                az pipelines runs list @InputArgs; return 
+            }
             throw "Install gh or az to list pipeline runs."
         }
         "watch" {
             if ($hostName -eq "azure") {
-                if (-not (Get-Command az -ErrorAction SilentlyContinue)) { throw "This looks like an Azure repo, but az was not found." }
+                if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+                    throw "This looks like an Azure repo, but az was not found." 
+                }
                 $runId = Get-PipelineRunId
-                if ([string]::IsNullOrWhiteSpace($runId)) { throw "Usage: ilegna pipeline watch <run-id>" }
+                if ([string]::IsNullOrWhiteSpace($runId)) {
+                    throw "Usage: ilegna pipeline watch <run-id>" 
+                }
 
                 while ($true) {
                     $run = az pipelines runs show --id $runId --query "{id:id,status:status,result:result,branch:sourceBranch}" -o json | ConvertFrom-Json
                     Write-IlegnaLine ("{0} status={1} result={2} branch={3}" -f $run.id, $run.status, $run.result, $run.branch) Cyan
-                    if ($run.status -eq "completed") { return }
+                    if ($run.status -eq "completed") {
+                        return 
+                    }
                     Start-Sleep -Seconds 10
                 }
             }
 
-            if (Get-Command gh -ErrorAction SilentlyContinue) { gh run watch @InputArgs; return }
+            if (Get-Command gh -ErrorAction SilentlyContinue) {
+                gh run watch @InputArgs; return 
+            }
             throw "Install gh to watch GitHub Actions runs."
         }
         { $_ -in @("open", "view") } {
             if ($hostName -eq "azure") {
-                if (-not (Get-Command az -ErrorAction SilentlyContinue)) { throw "This looks like an Azure repo, but az was not found." }
+                if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+                    throw "This looks like an Azure repo, but az was not found." 
+                }
                 $runId = Get-PipelineRunId
-                if ([string]::IsNullOrWhiteSpace($runId)) { throw "Usage: ilegna pipeline open <run-id>" }
+                if ([string]::IsNullOrWhiteSpace($runId)) {
+                    throw "Usage: ilegna pipeline open <run-id>" 
+                }
                 az pipelines runs show --id $runId --open
                 return
             }
 
-            if (Get-Command gh -ErrorAction SilentlyContinue) { gh run view --web @InputArgs; return }
+            if (Get-Command gh -ErrorAction SilentlyContinue) {
+                gh run view --web @InputArgs; return 
+            }
             throw "Install gh to open GitHub Actions runs."
         }
         default {
@@ -1152,9 +1457,16 @@ function Get-IlegnaStateRoot {
     [CmdletBinding()]
     param()
 
-    $base = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { Join-Path $HOME ".local\share" }
+    $base = if ($env:LOCALAPPDATA) {
+        $env:LOCALAPPDATA 
+    }
+    else {
+        Join-Path $HOME ".local\share" 
+    }
     $root = Join-Path $base "ilegna"
-    if (-not (Test-Path $root)) { New-Item -ItemType Directory -Path $root -Force | Out-Null }
+    if (-not (Test-Path $root)) {
+        New-Item -ItemType Directory -Path $root -Force | Out-Null 
+    }
     return $root
 }
 
@@ -1170,8 +1482,62 @@ function Get-IlegnaTimer {
     param()
 
     $path = Get-IlegnaTimerPath
-    if (-not (Test-Path $path)) { return $null }
+    if (-not (Test-Path $path)) {
+        return $null 
+    }
     Get-Content -Path $path -Raw | ConvertFrom-Json
+}
+
+function ConvertFrom-IlegnaTimerStartedAt {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "Jira timer startedAt is empty." 
+    }
+
+    $parsed = [datetime]::MinValue
+    $roundtripStyles = [System.Globalization.DateTimeStyles]::AllowWhiteSpaces -bor [System.Globalization.DateTimeStyles]::RoundtripKind
+    if ([datetime]::TryParseExact($Value, "o", [System.Globalization.CultureInfo]::InvariantCulture, $roundtripStyles, [ref]$parsed)) {
+        return $parsed
+    }
+
+    $styles = [System.Globalization.DateTimeStyles]::AllowWhiteSpaces -bor [System.Globalization.DateTimeStyles]::AssumeLocal
+    $cultures = @(
+        [System.Globalization.CultureInfo]::CurrentCulture,
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.CultureInfo]::GetCultureInfo("en-US"),
+        [System.Globalization.CultureInfo]::GetCultureInfo("pt-BR")
+    )
+
+    if ($Value -match '^\s*(\d{1,2})/(\d{1,2})/') {
+        $first = [int]$Matches[1]
+        $second = [int]$Matches[2]
+        if ($second -gt 12) {
+            $cultures = @(
+                [System.Globalization.CultureInfo]::GetCultureInfo("en-US"),
+                [System.Globalization.CultureInfo]::InvariantCulture,
+                [System.Globalization.CultureInfo]::CurrentCulture,
+                [System.Globalization.CultureInfo]::GetCultureInfo("pt-BR")
+            )
+        }
+        elseif ($first -gt 12) {
+            $cultures = @(
+                [System.Globalization.CultureInfo]::GetCultureInfo("pt-BR"),
+                [System.Globalization.CultureInfo]::CurrentCulture,
+                [System.Globalization.CultureInfo]::InvariantCulture,
+                [System.Globalization.CultureInfo]::GetCultureInfo("en-US")
+            )
+        }
+    }
+
+    foreach ($culture in $cultures) {
+        if ([datetime]::TryParse($Value, $culture, $styles, [ref]$parsed)) {
+            return $parsed 
+        }
+    }
+
+    throw "Unable to parse Jira timer startedAt '$Value'. Start a new timer with: ilegna jira start <ISSUE> [description]"
 }
 
 function Resolve-IlegnaJiraCli {
@@ -1189,12 +1555,18 @@ function Resolve-IlegnaJiraCli {
     }
 
     foreach ($candidate in @($candidates)) {
-        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
-        if (Test-Path -LiteralPath $candidate) { return $candidate }
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue 
+        }
+        if (Test-Path -LiteralPath $candidate) {
+            return $candidate 
+        }
     }
 
     $command = Get-Command jira -ErrorAction SilentlyContinue
-    if ($command) { return $command.Source }
+    if ($command) {
+        return $command.Source 
+    }
 
     throw "jira CLI not found. Install ankitpokhrel/jira-cli or place jira.exe in C:\tools\jira-cli."
 }
@@ -1214,7 +1586,9 @@ function Invoke-IlegnaJira {
         [string[]]$InputArgs
     )
 
-    if ([string]::IsNullOrWhiteSpace($Subcommand)) { $Subcommand = "mine" }
+    if ([string]::IsNullOrWhiteSpace($Subcommand)) {
+        $Subcommand = "mine" 
+    }
     $parsed = Split-IlegnaArgs -InputArgs $InputArgs
 
     switch ($Subcommand.ToLowerInvariant()) {
@@ -1223,12 +1597,16 @@ function Invoke-IlegnaJira {
         }
         "mine" {
             [string[]]$jiraArgs = @("issue", "list", "--jql", "assignee = currentUser() ORDER BY updated DESC")
-            if ($InputArgs) { $jiraArgs += @($InputArgs) }
+            if ($InputArgs) {
+                $jiraArgs += @($InputArgs) 
+            }
             Invoke-IlegnaJiraCli -Arguments $jiraArgs
         }
         "start" {
             $issue = $parsed.Positionals | Select-Object -First 1
-            if ([string]::IsNullOrWhiteSpace($issue)) { throw "Usage: ilegna jira start <ISSUE-123> [description]" }
+            if ([string]::IsNullOrWhiteSpace($issue)) {
+                throw "Usage: ilegna jira start <ISSUE-123> [description]" 
+            }
 
             $description = @($parsed.Positionals | Select-Object -Skip 1) -join " "
             $timer = [pscustomobject]@{
@@ -1241,24 +1619,35 @@ function Invoke-IlegnaJira {
         }
         "show" {
             $timer = Get-IlegnaTimer
-            if (-not $timer) { Write-IlegnaLine "No active timer." Yellow; return }
+            if (-not $timer) {
+                Write-IlegnaLine "No active timer." Yellow; return 
+            }
 
-            $started = [datetime]::Parse($timer.startedAt)
+            $started = ConvertFrom-IlegnaTimerStartedAt -Value $timer.startedAt
             $elapsed = New-TimeSpan -Start $started -End (Get-Date)
             Write-IlegnaLine ("{0} running for {1:hh\:mm}" -f $timer.issue, $elapsed) Cyan
-            if ($timer.description) { Write-IlegnaLine $timer.description DarkGray }
+            if ($timer.description) {
+                Write-IlegnaLine $timer.description DarkGray 
+            }
         }
         "stop" {
             $timer = Get-IlegnaTimer
-            if (-not $timer) { Write-IlegnaLine "No active timer." Yellow; return }
+            if (-not $timer) {
+                Write-IlegnaLine "No active timer." Yellow; return 
+            }
 
-            $started = [datetime]::Parse($timer.startedAt)
+            $started = ConvertFrom-IlegnaTimerStartedAt -Value $timer.startedAt
             $elapsed = New-TimeSpan -Start $started -End (Get-Date)
             $minutes = [Math]::Max(1, [Math]::Ceiling($elapsed.TotalMinutes))
             $log = Test-IlegnaFlag -Parsed $parsed -Names @("log")
 
             if ($log) {
-                $comment = if ($timer.description) { $timer.description } else { "Work logged from ilegna" }
+                $comment = if ($timer.description) {
+                    $timer.description 
+                }
+                else {
+                    "Automated worklog" 
+                }
                 Invoke-IlegnaJiraCli -Arguments @("issue", "worklog", "add", $timer.issue, "$($minutes)m", "--comment", $comment, "--no-input")
             }
 
@@ -1285,6 +1674,7 @@ function Invoke-IlegnaDoctor {
         @{ Name = "az"; Command = "az" },
         @{ Name = "jira"; Command = "jira" },
         @{ Name = "codex"; Command = "codex" },
+        @{ Name = "rtk"; Command = "rtk" },
         @{ Name = "opencode"; Command = "opencode" }
     )
 
@@ -1316,7 +1706,9 @@ function Invoke-IlegnaConfig {
         [string[]]$InputArgs
     )
 
-    if ([string]::IsNullOrWhiteSpace($Subcommand)) { $Subcommand = "backup" }
+    if ([string]::IsNullOrWhiteSpace($Subcommand)) {
+        $Subcommand = "backup" 
+    }
 
     $scriptPath = Join-Path $PSScriptRoot "config-backup.ps1"
     if (-not (Test-Path $scriptPath)) {
@@ -1337,7 +1729,9 @@ function Invoke-IlegnaConfig {
         }
         "restore" {
             $positionalVersion = $parsed.Positionals | Select-Object -First 1
-            if ([string]::IsNullOrWhiteSpace($version)) { $version = $positionalVersion }
+            if ([string]::IsNullOrWhiteSpace($version)) {
+                $version = $positionalVersion 
+            }
             & $scriptPath -Action restore -Version $version -Items ($items -split ",") -Force:$force
         }
         default {
@@ -1357,14 +1751,30 @@ try {
     }
 
     switch ($Resource.ToLowerInvariant()) {
-        { $_ -in @("wt", "worktree", "worktrees") } { Invoke-IlegnaWorktree -Subcommand $Command -InputArgs $CliArgs; break }
-        { $_ -in @("git-bare", "bare") } { Invoke-IlegnaGitBare -Subcommand $Command -InputArgs $CliArgs; break }
-        { $_ -in @("pr", "pull-request", "pull-requests") } { Invoke-IlegnaPullRequest -Subcommand $Command -InputArgs $CliArgs; break }
-        { $_ -in @("pipeline", "pipelines", "ci") } { Invoke-IlegnaPipeline -Subcommand $Command -InputArgs $CliArgs; break }
-        "jira" { Invoke-IlegnaJira -Subcommand $Command -InputArgs $CliArgs; break }
-        "config" { Invoke-IlegnaConfig -Subcommand $Command -InputArgs $CliArgs; break }
-        "doctor" { Invoke-IlegnaDoctor; break }
-        default { throw "Unknown resource: $Resource" }
+        { $_ -in @("wt", "worktree", "worktrees") } {
+            Invoke-IlegnaWorktree -Subcommand $Command -InputArgs $CliArgs; break 
+        }
+        { $_ -in @("git-bare", "bare") } {
+            Invoke-IlegnaGitBare -Subcommand $Command -InputArgs $CliArgs; break 
+        }
+        { $_ -in @("pr", "pull-request", "pull-requests") } {
+            Invoke-IlegnaPullRequest -Subcommand $Command -InputArgs $CliArgs; break 
+        }
+        { $_ -in @("pipeline", "pipelines", "ci") } {
+            Invoke-IlegnaPipeline -Subcommand $Command -InputArgs $CliArgs; break 
+        }
+        "jira" {
+            Invoke-IlegnaJira -Subcommand $Command -InputArgs $CliArgs; break 
+        }
+        "config" {
+            Invoke-IlegnaConfig -Subcommand $Command -InputArgs $CliArgs; break 
+        }
+        "doctor" {
+            Invoke-IlegnaDoctor; break 
+        }
+        default {
+            throw "Unknown resource: $Resource" 
+        }
     }
 }
 catch {
