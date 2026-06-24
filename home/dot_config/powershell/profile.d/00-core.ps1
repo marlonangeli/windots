@@ -37,6 +37,19 @@ function Invoke-ShellInitScript {
     }
 }
 
+function Test-WindotsEnvFlag {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Name,
+        [bool]$Default = $false
+    )
+
+    $value = [Environment]::GetEnvironmentVariable($Name)
+    if ([string]::IsNullOrWhiteSpace($value)) { return $Default }
+
+    return ($value.Trim().ToLowerInvariant() -in @("1", "true", "yes", "on", "y"))
+}
+
 function Get-ProfileMode {
     [CmdletBinding()]
     param()

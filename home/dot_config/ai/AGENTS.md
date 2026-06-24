@@ -7,6 +7,6 @@ For this machine, `windots` owns dotfiles and setup. The `ilegna` CLI owns day-t
 Default terminal workflow:
 
 - PowerShell loads `~/.config/powershell/profile.d/*.ps1`.
-- `mise` uses shims by default; run `Enable-MiseActivation` only inside shells that need prompt-time activation.
+- `mise` shims stay in PATH and PowerShell activates mise by default; set `WINDOTS_ENABLE_MISE_ACTIVATION=0` for shells that should use shims only.
 - Starship loads by default from cached init; zoxide initializes lazily on first `z` or `zi`.
 - OpenCode is preferred from a terminal or WSL when Windows terminal behavior gets in the way.

@@ -61,8 +61,8 @@
 
 ## 10) Fast Shell Startup
 
-- `mise` uses shims/PATH by default.
-- `mise activate` runs only when `Enable-MiseActivation` is called manually.
+- `mise` shims remain in PATH, and PowerShell runs `mise activate pwsh` by default.
+- Startup features use `WINDOTS_ENABLE_*` environment flags; set `WINDOTS_ENABLE_MISE_ACTIVATION=0` for shells that should use shims only.
 - Starship loads by default from a cached init script and falls back to a plain prompt if the cache is missing.
 - Zoxide initializes lazily the first time `z` or `zi` is called.
 
@@ -71,3 +71,4 @@
 - `ilegna config backup` captures machine-local Git and SSH host config before chezmoi applies managed files.
 - `ilegna config restore` never overwrites silently; it prompts or requires `--force` and saves pre-restore copies.
 - Personal Git aliases/scripts belong in `~/.gitconfig.local`, which is included by managed `.gitconfig` but not managed by chezmoi.
+- SSH config is machine-local and is backed up/restored, not managed by chezmoi. Hosts that must appear in remote editor pickers belong directly in `~/.ssh/config`; `Include`-only host files are not reliable across VS Code/Zed.

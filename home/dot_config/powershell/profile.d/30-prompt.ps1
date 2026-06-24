@@ -29,12 +29,16 @@ function Enable-MiseActivation {
     [CmdletBinding()]
     param()
 
+    if ($global:__WindotsMiseActivationLoaded) { return $true }
+
     if (-not (Get-Command mise -ErrorAction SilentlyContinue)) {
         Write-Warning "mise not found in PATH."
         return $false
     }
 
-    Invoke-ShellInitScript -Command "mise" -Arguments @("activate", "pwsh") | Out-Null
+    if (-not (Invoke-ShellInitScript -Command "mise" -Arguments @("activate", "pwsh"))) { return $false }
+
+    $global:__WindotsMiseActivationLoaded = $true
     return $true
 }
 
@@ -47,4 +51,8 @@ function global:prompt {
     }
 
     Invoke-WindotsFallbackPrompt
+}
+
+if (Test-WindotsEnvFlag -Name "WINDOTS_ENABLE_MISE_ACTIVATION" -Default $true) {
+    Enable-MiseActivation | Out-Null
 }

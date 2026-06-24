@@ -35,4 +35,4 @@ else {
 }
 
 $env:MISE_NOT_FOUND_AUTO_INSTALL = "0"
-Log-Info "mise configured for shims/PATH. Set MISE_ACTIVATE=1 before pwsh to opt into prompt-time activation."
+Log-Info "mise configured for shims/PATH. PowerShell activates mise by default; set WINDOTS_ENABLE_MISE_ACTIVATION=0 to disable."

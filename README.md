@@ -97,7 +97,7 @@ ilegna config restore latest --items ssh
 
 Restore asks before overwriting existing files and saves pre-restore copies. Use `--force` only when you intentionally want to overwrite without prompts.
 
-Keep personal Git aliases/scripts in `~/.gitconfig.local`; the managed `.gitconfig` includes it and chezmoi does not manage that local file.
+Keep personal Git aliases/scripts in `~/.gitconfig.local`; the managed `.gitconfig` includes it and chezmoi does not manage that local file. SSH config is backed up/restored but not managed by chezmoi; keep editor-visible hosts directly in `~/.ssh/config` because some remote editors do not resolve hosts that exist only through `Include` files.
 
 ## Zellij Layouts
 
@@ -115,7 +115,7 @@ The Zellij config sets `pwsh` as the default shell. `oc` opens OpenCode next to 
 - `home/dot_config/powershell/profile.d/`: fast modular PowerShell profile.
 - `home/dot_config/mise/config.toml.tmpl`: toolchain source of truth.
 - `home/dot_config/starship.toml`: minimal prompt.
-- `home/dot_gitconfig.tmpl`: Git defaults with `delta`, `rerere`, `pull.ff only`, and `zdiff3`.
+- `home/dot_gitconfig.tmpl`: Git defaults with `delta`, `rerere`, and `zdiff3`.
 - `home/dot_config/windows-terminal/settings.json.tmpl`: PowerShell, Arch WSL, and Arch Zellij profiles.
 - `home/dot_wslconfig`: WSL defaults tuned for Docker/WSL dev.
 - `home/dot_config/ai/`: shared AI context, skills, and MCP references.
@@ -140,10 +140,11 @@ $env:WINDOTS_PROFILE_DEBUG = "1"
 pwsh
 ```
 
-Starship loads by default from the cached init script. `mise` uses shims/PATH; run activation only inside a shell that needs it:
+Starship loads by default from the cached init script. PowerShell activates `mise` by default; disable prompt-time activation with an env flag when a shell should use shims only:
 
 ```powershell
-Enable-MiseActivation
+$env:WINDOTS_ENABLE_MISE_ACTIVATION = "0"
+pwsh
 ```
 
 ## Module Bootstrap

@@ -118,7 +118,7 @@ ilegna config restore latest --items git
 ilegna config restore latest --items ssh
 ```
 
-`restore` prompts before overwriting and stores a `pre-restore-*` copy of files it replaces. Put custom Git aliases/scripts in `~/.gitconfig.local`; windots includes that file without managing it.
+`restore` prompts before overwriting and stores a `pre-restore-*` copy of files it replaces. Put custom Git aliases/scripts in `~/.gitconfig.local`; windots includes that file without managing it. SSH config is not managed by chezmoi; put hosts used by VS Code/Zed directly in `~/.ssh/config` instead of relying on `Include ~/.ssh/config.local`.
 
 ## Zellij Layouts
 

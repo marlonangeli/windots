@@ -4,6 +4,8 @@ $env:POWERSHELL_TELEMETRY_OPTOUT = "1"
 $env:MISE_NOT_FOUND_AUTO_INSTALL = "0"
 $env:SHELL = "pwsh"
 
+if ([string]::IsNullOrWhiteSpace($env:WINDOTS_ENABLE_MISE_ACTIVATION)) { $env:WINDOTS_ENABLE_MISE_ACTIVATION = "1" }
+
 if ([string]::IsNullOrWhiteSpace($env:EDITOR)) { $env:EDITOR = "zed" }
 if ([string]::IsNullOrWhiteSpace($env:VISUAL)) { $env:VISUAL = $env:EDITOR }
 

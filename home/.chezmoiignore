@@ -1,9 +1,10 @@
-# Ignore local/private state from source import
+# Ignore local/private state from source import/apply
 dot_codex/auth.json
 dot_codex/sessions/**
 dot_codex/log/**
 dot_copilot/logs/**
 dot_copilot/session-state/**
 dot_docker/contexts/**
+.ssh/**
 dot_ssh/**
 dot_sophos-vpn/**
