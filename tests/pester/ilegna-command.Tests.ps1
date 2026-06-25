@@ -155,6 +155,12 @@ Describe "ilegna command surface" {
         $content | Should Match '"complete", "approve"'
         $content | Should Match '"devops", "invoke", "--area", "release", "--resource", "approvals"'
         $content | Should Match '"statusFilter=\$statusFilter"'
+        $content | Should Match 'Get-AzureYamlApprovalsFromTimeline'
+        $content | Should Match '_apis/build/Builds/\{2\}/Timeline\?api-version=\{3\}'
+        $content | Should Match '_apis/pipelines/approvals\?api-version=\{2\}'
+        $content | Should Match 'approvalId = \$ApprovalId'
+        $content | Should Match 'comment = \$comment'
+        $content | Should Match '\$details = \$_\.ErrorDetails\.Message'
     }
 
     It "initializes RTK for OpenCode from PowerShell" {

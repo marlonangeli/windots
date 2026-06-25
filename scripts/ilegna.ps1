@@ -94,14 +94,16 @@ Commands:
   open <run-id>                           open a run in the browser
   active|definitions [--repo name]        show enabled Azure pipelines for repo
   trigger|run|start [--id id] [--dry-run] queue an Azure pipeline
-  approvals [--status pending]            list pending release approvals
-  complete|approve --approval-id id       approve a release approval
+  approvals [--run-id id] [--stage name]  list pending YAML or release approvals
+  complete|approve --approval-id id       approve a YAML or release approval
+  complete|approve --run-id id --stage name approve a YAML stage approval
 
 Examples:
   ilegna pipeline list
   ilegna pipeline active
   ilegna pipeline trigger --dry-run
-  ilegna pipeline complete --approval-id 123 --dry-run
+  ilegna pipeline approvals --run-id 7995 --stage Deploy_Dev
+  ilegna pipeline complete --run-id 7995 --stage Deploy_Dev --dry-run
 "@
             return
         }
@@ -1448,23 +1450,257 @@ function Invoke-IlegnaPipeline {
         return $null
     }
 
-    function Invoke-AzurePipelineApprovals {
-        param([switch]$Approve)
+    function Test-IlegnaGuidString {
+        param([string]$Value)
+
+        if ([string]::IsNullOrWhiteSpace($Value)) {
+            return $false
+        }
+
+        $guid = [guid]::Empty
+        return [guid]::TryParse($Value, [ref]$guid)
+    }
+
+    function Get-AzureDevOpsCollectionUrl {
+        $collection = Get-IlegnaOption -Parsed $parsed -Names @("collection-url", "organization", "org")
+        if (-not [string]::IsNullOrWhiteSpace($collection)) {
+            return $collection.TrimEnd("/")
+        }
+
+        $remote = Get-AzureDevOpsRemoteUrl
+        if ([string]::IsNullOrWhiteSpace($remote)) {
+            return $null
+        }
+
+        if ($remote -match '^(https?://[^/]+/[^/]+)/[^/]+/_git/[^/]+/?$') {
+            return $Matches[1].TrimEnd("/")
+        }
+        if ($remote -match '^(https?://[^/]+)/([^/]+)/_git/[^/]+/?$') {
+            return ("{0}/{1}" -f $Matches[1].TrimEnd("/"), $Matches[2])
+        }
+        return $null
+    }
+
+    function Invoke-AzureDevOpsRest {
+        param(
+            [Parameter(Mandatory)][string]$Method,
+            [Parameter(Mandatory)][string]$Uri,
+            [object]$Body
+        )
+
+        $invokeArgs = @{
+            Method = $Method
+            Uri = $Uri
+            ErrorAction = "Stop"
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($env:AZURE_DEVOPS_EXT_PAT)) {
+            $tokenBytes = [Text.Encoding]::ASCII.GetBytes(":$env:AZURE_DEVOPS_EXT_PAT")
+            $invokeArgs.Headers = @{ Authorization = "Basic {0}" -f [Convert]::ToBase64String($tokenBytes) }
+        }
+        else {
+            $invokeArgs.UseDefaultCredentials = $true
+        }
+
+        if ($null -ne $Body) {
+            $invokeArgs.Body = $Body
+            $invokeArgs.ContentType = "application/json"
+        }
+
+        try {
+            Invoke-RestMethod @invokeArgs
+        }
+        catch {
+            $details = $_.ErrorDetails.Message
+            if ([string]::IsNullOrWhiteSpace($details)) {
+                $details = $_.Exception.Message
+            }
+            throw "Unable to call Azure DevOps REST API '$Uri'. $details"
+        }
+    }
+
+    function Get-AzurePipelineRunIdForApprovals {
+        $runId = Get-IlegnaOption -Parsed $parsed -Names @("run-id", "build-id", "run", "build")
+        if (-not [string]::IsNullOrWhiteSpace($runId)) {
+            return $runId
+        }
+
+        if (-not $Approve -and $parsed.Positionals.Count -gt 0 -and $parsed.Positionals[0] -match '^\d+$') {
+            return $parsed.Positionals[0]
+        }
+        return $null
+    }
+
+    function Get-AzureYamlApprovalUri {
+        param([Parameter(Mandatory)][string]$Project)
+
+        $collectionUrl = Get-AzureDevOpsCollectionUrl
+        if ([string]::IsNullOrWhiteSpace($collectionUrl)) {
+            throw "Unable to resolve Azure DevOps collection URL. Pass --collection-url <url>."
+        }
+
+        $apiVersion = Get-IlegnaOption -Parsed $parsed -Names @("approval-api-version") -Default "6.1-preview.1"
+        $encodedProject = [uri]::EscapeDataString($Project)
+        return "{0}/{1}/_apis/pipelines/approvals?api-version={2}" -f $collectionUrl.TrimEnd("/"), $encodedProject, $apiVersion
+    }
+
+    function Get-AzureBuildTimeline {
+        param(
+            [Parameter(Mandatory)][string]$Project,
+            [Parameter(Mandatory)][string]$RunId
+        )
+
+        $collectionUrl = Get-AzureDevOpsCollectionUrl
+        if ([string]::IsNullOrWhiteSpace($collectionUrl)) {
+            throw "Unable to resolve Azure DevOps collection URL. Pass --collection-url <url>."
+        }
+
+        $apiVersion = Get-IlegnaOption -Parsed $parsed -Names @("timeline-api-version", "build-api-version") -Default "6.0"
+        $encodedProject = [uri]::EscapeDataString($Project)
+        $encodedRunId = [uri]::EscapeDataString($RunId)
+        $uri = "{0}/{1}/_apis/build/Builds/{2}/Timeline?api-version={3}" -f $collectionUrl.TrimEnd("/"), $encodedProject, $encodedRunId, $apiVersion
+        Invoke-AzureDevOpsRest -Method "GET" -Uri $uri
+    }
+
+    function Test-AzureTimelineStageMatch {
+        param(
+            [object]$Stage,
+            [string]$Filter
+        )
+
+        if ([string]::IsNullOrWhiteSpace($Filter)) {
+            return $true
+        }
+        if ($null -eq $Stage) {
+            return $false
+        }
+
+        return $Stage.identifier -eq $Filter -or $Stage.name -eq $Filter -or $Stage.identifier -like "*$Filter*" -or $Stage.name -like "*$Filter*"
+    }
+
+    function Resolve-AzureTimelineStage {
+        param(
+            [Parameter(Mandatory)][hashtable]$RecordsById,
+            [object]$Record
+        )
+
+        $current = $Record
+        while ($null -ne $current -and -not [string]::IsNullOrWhiteSpace($current.parentId)) {
+            $parent = $RecordsById[$current.parentId]
+            if ($null -eq $parent) {
+                return $null
+            }
+            if ($parent.type -eq "Stage") {
+                return $parent
+            }
+            $current = $parent
+        }
+
+        return $null
+    }
+
+    function Get-AzureYamlApprovalsFromTimeline {
+        param(
+            [Parameter(Mandatory)][string]$Project,
+            [Parameter(Mandatory)][string]$RunId,
+            [string]$StageFilter
+        )
+
+        $timeline = Get-AzureBuildTimeline -Project $Project -RunId $RunId
+        $records = @($timeline.records)
+        $recordsById = @{}
+        foreach ($record in $records) {
+            if (-not [string]::IsNullOrWhiteSpace($record.id)) {
+                $recordsById[$record.id] = $record
+            }
+        }
+
+        $statusFilter = Get-IlegnaOption -Parsed $parsed -Names @("status", "status-filter") -Default "pending"
+        $includeAll = $statusFilter -eq "all"
+        $approvals = @()
+        foreach ($record in $records) {
+            if ($record.type -ne "Checkpoint.Approval") {
+                continue
+            }
+            if (-not $includeAll -and $record.state -notin @("inProgress", "pending")) {
+                continue
+            }
+
+            $stage = Resolve-AzureTimelineStage -RecordsById $recordsById -Record $record
+            if (-not (Test-AzureTimelineStageMatch -Stage $stage -Filter $StageFilter)) {
+                continue
+            }
+
+            $checkpoint = $recordsById[$record.parentId]
+            $approvals += [pscustomobject]@{
+                runId = $RunId
+                approvalId = $record.id
+                status = if ($record.result) { $record.result } else { $record.state }
+                stageIdentifier = $stage.identifier
+                stageName = $stage.name
+                stageState = $stage.state
+                checkpointId = $checkpoint.id
+                checkpointState = $checkpoint.state
+                createdOn = $record.startTime
+            }
+        }
+
+        return @($approvals)
+    }
+
+    function Get-AzureYamlApprovalById {
+        param(
+            [Parameter(Mandatory)][string]$Project,
+            [Parameter(Mandatory)][string]$ApprovalId
+        )
+
+        $baseUri = Get-AzureYamlApprovalUri -Project $Project
+        $uri = "{0}&approvalIds={1}" -f $baseUri, [uri]::EscapeDataString($ApprovalId)
+        Invoke-AzureDevOpsRest -Method "GET" -Uri $uri
+    }
+
+    function Invoke-AzureYamlApprovalUpdate {
+        param(
+            [Parameter(Mandatory)][string]$Project,
+            [Parameter(Mandatory)][string]$ApprovalId
+        )
+
+        $comment = Get-IlegnaOption -Parsed $parsed -Names @("comment", "message") -Default "Approved by ilegna pipeline complete"
+        $status = Get-IlegnaOption -Parsed $parsed -Names @("status") -Default "approved"
+        $payloadObject = @(
+            @{
+                approvalId = $ApprovalId
+                comment = $comment
+                status = $status
+            }
+        )
+        $payload = ConvertTo-Json -InputObject $payloadObject -Depth 5
+        $uri = Get-AzureYamlApprovalUri -Project $Project
+
+        if (Test-IlegnaFlag -Parsed $parsed -Names @("dry-run", "whatif")) {
+            Write-IlegnaLine ("PATCH {0}" -f $uri) DarkGray
+            Write-IlegnaLine $payload DarkGray
+            return
+        }
+
+        Invoke-AzureDevOpsRest -Method "PATCH" -Uri $uri -Body $payload | ConvertTo-Json -Depth 10
+    }
+
+    function Invoke-AzureReleaseApproval {
+        param(
+            [switch]$Approve,
+            [string]$Project,
+            [string]$ApprovalId
+        )
 
         Assert-AzureCli
-        $project = Get-AzureDevOpsProjectName
-        $approvalId = Get-IlegnaOption -Parsed $parsed -Names @("approval-id", "approval", "id")
-        if ([string]::IsNullOrWhiteSpace($approvalId)) {
-            $approvalId = $parsed.Positionals | Select-Object -First 1
-        }
-
         $apiVersion = Get-IlegnaOption -Parsed $parsed -Names @("api-version") -Default "7.0"
         $azArgs = @("devops", "invoke", "--area", "release", "--resource", "approvals", "--api-version", $apiVersion, "-o", "json")
-        if (-not [string]::IsNullOrWhiteSpace($project)) {
-            $azArgs += @("--route-parameters", "project=$project")
+        if (-not [string]::IsNullOrWhiteSpace($Project)) {
+            $azArgs += @("--route-parameters", "project=$Project")
         }
 
-        if (-not $Approve -or [string]::IsNullOrWhiteSpace($approvalId)) {
+        if (-not $Approve -or [string]::IsNullOrWhiteSpace($ApprovalId)) {
             $statusFilter = Get-IlegnaOption -Parsed $parsed -Names @("status", "status-filter") -Default "pending"
             $listArgs = @($azArgs + @("--query-parameters", "statusFilter=$statusFilter"))
             az @listArgs
@@ -1483,7 +1719,7 @@ function Invoke-IlegnaPipeline {
             status = $status
             comments = $comment
         } | ConvertTo-Json -Depth 5
-        $patchArgs = @($azArgs + @("--http-method", "PATCH", "--query-parameters", "approvalId=$approvalId"))
+        $patchArgs = @($azArgs + @("--http-method", "PATCH", "--query-parameters", "approvalId=$ApprovalId"))
         if (Test-IlegnaFlag -Parsed $parsed -Names @("dry-run", "whatif")) {
             Write-IlegnaLine ("az {0} --in-file <payload>" -f ($patchArgs -join " ")) DarkGray
             Write-IlegnaLine $payload DarkGray
@@ -1496,12 +1732,62 @@ function Invoke-IlegnaPipeline {
             Set-Content -LiteralPath $tempFile.FullName -Value $payload -Encoding UTF8
             az @($patchArgs + @("--in-file", $tempFile.FullName))
             if ($LASTEXITCODE -ne 0) {
-                throw "Unable to update Azure DevOps release approval '$approvalId'."
+                throw "Unable to update Azure DevOps release approval '$ApprovalId'."
             }
         }
         finally {
             Remove-Item -LiteralPath $tempFile.FullName -Force -ErrorAction SilentlyContinue
         }
+    }
+
+    function Invoke-AzurePipelineApprovals {
+        param([switch]$Approve)
+
+        $project = Get-AzureDevOpsProjectName
+        $approvalId = Get-IlegnaOption -Parsed $parsed -Names @("approval-id", "approval", "id")
+        if ([string]::IsNullOrWhiteSpace($approvalId) -and $parsed.Positionals.Count -gt 0 -and ($Approve -or (Test-IlegnaGuidString -Value $parsed.Positionals[0]))) {
+            $approvalId = $parsed.Positionals[0]
+        }
+        $runId = Get-AzurePipelineRunIdForApprovals
+        $stageFilter = Get-IlegnaOption -Parsed $parsed -Names @("stage", "job", "environment")
+        $forceYaml = (Test-IlegnaFlag -Parsed $parsed -Names @("yaml", "checks")) -or -not [string]::IsNullOrWhiteSpace($runId) -or (Test-IlegnaGuidString -Value $approvalId)
+        $forceRelease = Test-IlegnaFlag -Parsed $parsed -Names @("release", "classic")
+
+        if ($forceRelease -or -not $forceYaml) {
+            Invoke-AzureReleaseApproval -Approve:$Approve -Project $project -ApprovalId $approvalId
+            return
+        }
+
+        if ([string]::IsNullOrWhiteSpace($project)) {
+            throw "Unable to resolve Azure DevOps project. Pass --project <name>."
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($runId)) {
+            $approvals = @(Get-AzureYamlApprovalsFromTimeline -Project $project -RunId $runId -StageFilter $stageFilter)
+            if (-not $Approve) {
+                ConvertTo-Json -InputObject $approvals -Depth 8
+                return
+            }
+            if ($approvals.Count -eq 0) {
+                throw "No pending YAML approval found for run '$runId'."
+            }
+            if ($approvals.Count -gt 1) {
+                ConvertTo-Json -InputObject $approvals -Depth 8
+                throw "Multiple pending YAML approvals found for run '$runId'. Pass --stage <name> or --approval-id <id>."
+            }
+            $approvalId = $approvals[0].approvalId
+        }
+
+        if ([string]::IsNullOrWhiteSpace($approvalId)) {
+            throw "Pass an approval id or run id: ilegna pipeline complete --approval-id <id> OR ilegna pipeline complete --run-id <id> --stage <name>."
+        }
+
+        if (-not $Approve) {
+            Get-AzureYamlApprovalById -Project $project -ApprovalId $approvalId | ConvertTo-Json -Depth 10
+            return
+        }
+
+        Invoke-AzureYamlApprovalUpdate -Project $project -ApprovalId $approvalId
     }
 
     switch ($Subcommand.ToLowerInvariant()) {
