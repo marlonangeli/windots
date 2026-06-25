@@ -66,6 +66,15 @@ Describe "ilegna command surface" {
         $profileWrapperContent | Should Match '& \$scriptPath @args'
     }
 
+    It "hardens argument parsing and path handling" {
+        $content | Should Match '\$item -eq "--"'
+        $content | Should Match '\$separatorIndex = \$name\.IndexOf\("="\)'
+        $content | Should Match 'function Expand-IlegnaPathInput'
+        $content | Should Not Match 'ExpandString\(\$Path\)'
+        $content | Should Match 'Test-Path -LiteralPath \$target'
+        $content | Should Match 'Set-Location -LiteralPath \$path'
+    }
+
     It "uses Azure DevOps defaults for pull requests" {
         $content | Should Match '"repos", "pr", "create"'
         $content | Should Match '-Default "develop"'
@@ -84,6 +93,8 @@ Describe "ilegna command surface" {
         $content | Should Match 'function ConvertTo-IlegnaJiraDuration'
         $content | Should Match '"worklog"'
         $content | Should Match '"no-log", "skip-log"'
+        $content | Should Match 'jira CLI failed with exit code'
+        $content | Should Match 'Remove-Item -LiteralPath \(Get-IlegnaTimerPath\) -Force'
         $content | Should Not Match '--time-spent'
         $pathProfileContent | Should Match 'C:\\tools\\jira-cli'
     }
@@ -160,7 +171,10 @@ Describe "ilegna command surface" {
         $content | Should Match '_apis/pipelines/approvals\?api-version=\{2\}'
         $content | Should Match 'approvalId = \$ApprovalId'
         $content | Should Match 'comment = \$comment'
+        $content | Should Match 'function Assert-AzureApprovalStatus'
+        $content | Should Match 'Invalid approval status'
         $content | Should Match '\$details = \$_\.ErrorDetails\.Message'
+        $content | Should Match 'HTTP \$statusCode'
     }
 
     It "initializes RTK for OpenCode from PowerShell" {

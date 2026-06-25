@@ -248,6 +248,7 @@ function Split-IlegnaArgs {
     $options = @{}
     $flags = New-Object System.Collections.Generic.HashSet[string]([System.StringComparer]::OrdinalIgnoreCase)
 
+    # Small parser for ilegna-owned flags. Raw passthrough commands still receive the original InputArgs.
     for ($i = 0; $i -lt $inputList.Count; $i++) {
         $item = $inputList[$i]
         if ([string]::IsNullOrWhiteSpace($item)) {
@@ -255,9 +256,26 @@ function Split-IlegnaArgs {
         }
 
         $item = $item.ToString()
+        if ($item -eq "--") {
+            for ($j = $i + 1; $j -lt $inputList.Count; $j++) {
+                $positionals.Add($inputList[$j].ToString())
+            }
+            break
+        }
+
         if ($item.StartsWith("--")) {
             $name = $item.Substring(2)
             if ([string]::IsNullOrWhiteSpace($name)) {
+                continue
+            }
+
+            $separatorIndex = $name.IndexOf("=")
+            if ($separatorIndex -ge 0) {
+                $value = $name.Substring($separatorIndex + 1)
+                $name = $name.Substring(0, $separatorIndex)
+                if (-not [string]::IsNullOrWhiteSpace($name)) {
+                    $options[$name] = $value
+                }
                 continue
             }
 
@@ -280,6 +298,16 @@ function Split-IlegnaArgs {
         if ($item.StartsWith("-") -and $item.Length -gt 1) {
             $name = $item.Substring(1)
             if ([string]::IsNullOrWhiteSpace($name)) {
+                continue
+            }
+
+            $separatorIndex = $name.IndexOf("=")
+            if ($separatorIndex -ge 0) {
+                $value = $name.Substring($separatorIndex + 1)
+                $name = $name.Substring(0, $separatorIndex)
+                if (-not [string]::IsNullOrWhiteSpace($name)) {
+                    $options[$name] = $value
+                }
                 continue
             }
 
@@ -915,6 +943,32 @@ function Convert-BranchToWorktreeName {
     return ($Branch -replace '[^A-Za-z0-9._-]', '-')
 }
 
+function Expand-IlegnaPathInput {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Path)
+
+    # Expand common path shortcuts without evaluating arbitrary PowerShell expressions.
+    $expanded = [Environment]::ExpandEnvironmentVariables($Path)
+    $expanded = [regex]::Replace($expanded, '\$(?:env:)?([A-Za-z_][A-Za-z0-9_]*)', {
+            param($match)
+
+            $value = [Environment]::GetEnvironmentVariable($match.Groups[1].Value)
+            if ($null -eq $value) {
+                return $match.Value
+            }
+            return $value
+        })
+
+    if ($expanded -eq "~") {
+        return $HOME
+    }
+    if ($expanded.StartsWith("~/") -or $expanded.StartsWith("~\")) {
+        return (Join-Path $HOME $expanded.Substring(2))
+    }
+
+    return $expanded
+}
+
 function Get-DefaultWorktreeParent {
     [CmdletBinding()]
     param()
@@ -947,7 +1001,7 @@ function Resolve-WorktreePathInput {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Path)
 
-    $expanded = $ExecutionContext.InvokeCommand.ExpandString($Path)
+    $expanded = Expand-IlegnaPathInput -Path $Path
     if ([System.IO.Path]::IsPathRooted($expanded)) {
         return $expanded
     }
@@ -1066,11 +1120,11 @@ function Invoke-IlegnaWorktree {
             $path = Resolve-WorktreePathInput -Path $path
 
             $parent = Split-Path -Parent $path
-            if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path $parent)) {
+            if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path -LiteralPath $parent)) {
                 New-Item -ItemType Directory -Path $parent -Force | Out-Null
             }
 
-            if (Test-Path $path) {
+            if (Test-Path -LiteralPath $path) {
                 throw "Worktree path already exists: $path"
             }
 
@@ -1084,7 +1138,7 @@ function Invoke-IlegnaWorktree {
 
             Write-IlegnaLine "Worktree ready: $path" Green
             if ($cdAfter) {
-                Set-Location $path
+                Set-Location -LiteralPath $path
             }
         }
         "remove" {
@@ -1094,7 +1148,7 @@ function Invoke-IlegnaWorktree {
                 throw "Usage: ilegna wt remove <branch-or-path> [--force]"
             }
 
-            $path = if (Test-Path $target) {
+            $path = if (Test-Path -LiteralPath $target) {
                 $target
             }
             else {
@@ -1128,7 +1182,7 @@ function Invoke-IlegnaWorktree {
                 throw "Usage: ilegna wt open <branch-or-path>"
             }
 
-            $path = if (Test-Path $target) {
+            $path = if (Test-Path -LiteralPath $target) {
                 $target
             }
             else {
@@ -1137,7 +1191,7 @@ function Invoke-IlegnaWorktree {
             if ([string]::IsNullOrWhiteSpace($path)) {
                 throw "Worktree not found: $target"
             }
-            Set-Location $path
+            Set-Location -LiteralPath $path
         }
         "status" {
             Assert-GitRepository
@@ -1345,7 +1399,12 @@ function Invoke-IlegnaPipeline {
             return @()
         }
 
-        $definitions = ($json | Out-String) | ConvertFrom-Json
+        try {
+            $definitions = ($json | Out-String) | ConvertFrom-Json -ErrorAction Stop
+        }
+        catch {
+            throw "Unable to parse Azure pipeline list response. $($_.Exception.Message)"
+        }
         return @($definitions)
     }
 
@@ -1377,7 +1436,12 @@ function Invoke-IlegnaPipeline {
             if ($definition.id -and -not $definition.repository) {
                 $detailsJson = az pipelines show --id $definition.id -o json 2>$null
                 if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($detailsJson | Out-String))) {
-                    $details = ($detailsJson | Out-String) | ConvertFrom-Json
+                    try {
+                        $details = ($detailsJson | Out-String) | ConvertFrom-Json -ErrorAction Stop
+                    }
+                    catch {
+                        throw "Unable to parse Azure pipeline details for '$($definition.id)'. $($_.Exception.Message)"
+                    }
                 }
             }
 
@@ -1415,7 +1479,12 @@ function Invoke-IlegnaPipeline {
             if ($LASTEXITCODE -ne 0) {
                 throw "Unable to resolve Azure pipeline id '$id'."
             }
-            return (($json | Out-String) | ConvertFrom-Json)
+            try {
+                return (($json | Out-String) | ConvertFrom-Json -ErrorAction Stop)
+            }
+            catch {
+                throw "Unable to parse Azure pipeline id '$id'. $($_.Exception.Message)"
+            }
         }
 
         $name = Get-IlegnaOption -Parsed $parsed -Names @("name", "pipeline")
@@ -1461,6 +1530,14 @@ function Invoke-IlegnaPipeline {
         return [guid]::TryParse($Value, [ref]$guid)
     }
 
+    function Assert-AzureApprovalStatus {
+        param([Parameter(Mandatory)][string]$Status)
+
+        if ($Status -notin @("approved", "rejected")) {
+            throw "Invalid approval status '$Status'. Use approved or rejected."
+        }
+    }
+
     function Get-AzureDevOpsCollectionUrl {
         $collection = Get-IlegnaOption -Parsed $parsed -Names @("collection-url", "organization", "org")
         if (-not [string]::IsNullOrWhiteSpace($collection)) {
@@ -1483,7 +1560,7 @@ function Invoke-IlegnaPipeline {
 
     function Invoke-AzureDevOpsRest {
         param(
-            [Parameter(Mandatory)][string]$Method,
+            [Parameter(Mandatory)][ValidateSet("GET", "POST", "PATCH")][string]$Method,
             [Parameter(Mandatory)][string]$Uri,
             [object]$Body
         )
@@ -1515,11 +1592,25 @@ function Invoke-IlegnaPipeline {
             if ([string]::IsNullOrWhiteSpace($details)) {
                 $details = $_.Exception.Message
             }
-            throw "Unable to call Azure DevOps REST API '$Uri'. $details"
+            $statusCode = if ($_.Exception.Response) {
+                [int]$_.Exception.Response.StatusCode
+            }
+            else {
+                $null
+            }
+            $statusPrefix = if ($statusCode) {
+                "HTTP $statusCode. "
+            }
+            else {
+                ""
+            }
+            throw "Unable to call Azure DevOps REST API '$Uri'. $statusPrefix$details"
         }
     }
 
     function Get-AzurePipelineRunIdForApprovals {
+        param([switch]$Approve)
+
         $runId = Get-IlegnaOption -Parsed $parsed -Names @("run-id", "build-id", "run", "build")
         if (-not [string]::IsNullOrWhiteSpace($runId)) {
             return $runId
@@ -1554,6 +1645,9 @@ function Invoke-IlegnaPipeline {
         if ([string]::IsNullOrWhiteSpace($collectionUrl)) {
             throw "Unable to resolve Azure DevOps collection URL. Pass --collection-url <url>."
         }
+        if ($RunId -notmatch '^\d+$') {
+            throw "Invalid Azure pipeline run id '$RunId'. Use the numeric build/run id."
+        }
 
         $apiVersion = Get-IlegnaOption -Parsed $parsed -Names @("timeline-api-version", "build-api-version") -Default "6.0"
         $encodedProject = [uri]::EscapeDataString($Project)
@@ -1575,7 +1669,12 @@ function Invoke-IlegnaPipeline {
             return $false
         }
 
-        return $Stage.identifier -eq $Filter -or $Stage.name -eq $Filter -or $Stage.identifier -like "*$Filter*" -or $Stage.name -like "*$Filter*"
+        $identifier = if ($Stage.identifier) { [string]$Stage.identifier } else { "" }
+        $name = if ($Stage.name) { [string]$Stage.name } else { "" }
+        return $identifier.Equals($Filter, [StringComparison]::OrdinalIgnoreCase) `
+            -or $name.Equals($Filter, [StringComparison]::OrdinalIgnoreCase) `
+            -or $identifier.IndexOf($Filter, [StringComparison]::OrdinalIgnoreCase) -ge 0 `
+            -or $name.IndexOf($Filter, [StringComparison]::OrdinalIgnoreCase) -ge 0
     }
 
     function Resolve-AzureTimelineStage {
@@ -1606,6 +1705,7 @@ function Invoke-IlegnaPipeline {
             [string]$StageFilter
         )
 
+        # Azure DevOps Server exposes YAML approvals as timeline checkpoint records before REST can query them by status.
         $timeline = Get-AzureBuildTimeline -Project $Project -RunId $RunId
         $records = @($timeline.records)
         $recordsById = @{}
@@ -1667,6 +1767,7 @@ function Invoke-IlegnaPipeline {
 
         $comment = Get-IlegnaOption -Parsed $parsed -Names @("comment", "message") -Default "Approved by ilegna pipeline complete"
         $status = Get-IlegnaOption -Parsed $parsed -Names @("status") -Default "approved"
+        Assert-AzureApprovalStatus -Status $status
         $payloadObject = @(
             @{
                 approvalId = $ApprovalId
@@ -1715,6 +1816,7 @@ function Invoke-IlegnaPipeline {
 
         $comment = Get-IlegnaOption -Parsed $parsed -Names @("comment", "message") -Default "Approved by ilegna pipeline complete"
         $status = Get-IlegnaOption -Parsed $parsed -Names @("status") -Default "approved"
+        Assert-AzureApprovalStatus -Status $status
         $payload = @{
             status = $status
             comments = $comment
@@ -1748,8 +1850,9 @@ function Invoke-IlegnaPipeline {
         if ([string]::IsNullOrWhiteSpace($approvalId) -and $parsed.Positionals.Count -gt 0 -and ($Approve -or (Test-IlegnaGuidString -Value $parsed.Positionals[0]))) {
             $approvalId = $parsed.Positionals[0]
         }
-        $runId = Get-AzurePipelineRunIdForApprovals
+        $runId = Get-AzurePipelineRunIdForApprovals -Approve:$Approve
         $stageFilter = Get-IlegnaOption -Parsed $parsed -Names @("stage", "job", "environment")
+        # Default remains classic Release approvals unless a YAML run/id is explicit.
         $forceYaml = (Test-IlegnaFlag -Parsed $parsed -Names @("yaml", "checks")) -or -not [string]::IsNullOrWhiteSpace($runId) -or (Test-IlegnaGuidString -Value $approvalId)
         $forceRelease = Test-IlegnaFlag -Parsed $parsed -Names @("release", "classic")
 
@@ -1925,7 +2028,7 @@ function Get-IlegnaStateRoot {
         Join-Path $HOME ".local\share"
     }
     $root = Join-Path $base "ilegna"
-    if (-not (Test-Path $root)) {
+    if (-not (Test-Path -LiteralPath $root)) {
         New-Item -ItemType Directory -Path $root -Force | Out-Null
     }
     return $root
@@ -1943,10 +2046,15 @@ function Get-IlegnaTimer {
     param()
 
     $path = Get-IlegnaTimerPath
-    if (-not (Test-Path $path)) {
+    if (-not (Test-Path -LiteralPath $path)) {
         return $null
     }
-    Get-Content -Path $path -Raw | ConvertFrom-Json
+    try {
+        Get-Content -LiteralPath $path -Raw | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        throw "Unable to read Jira timer state at '$path'. $($_.Exception.Message)"
+    }
 }
 
 function ConvertFrom-IlegnaTimerStartedAt {
@@ -1957,6 +2065,7 @@ function ConvertFrom-IlegnaTimerStartedAt {
         throw "Jira timer startedAt is empty."
     }
 
+    # Old timer files may contain culture-specific DateTime strings from earlier versions.
     $parsed = [datetime]::MinValue
     $roundtripStyles = [System.Globalization.DateTimeStyles]::AllowWhiteSpaces -bor [System.Globalization.DateTimeStyles]::RoundtripKind
     if ([datetime]::TryParseExact($Value, "o", [System.Globalization.CultureInfo]::InvariantCulture, $roundtripStyles, [ref]$parsed)) {
@@ -2038,6 +2147,9 @@ function Invoke-IlegnaJiraCli {
 
     $jiraPath = Resolve-IlegnaJiraCli
     & $jiraPath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "jira CLI failed with exit code $LASTEXITCODE."
+    }
 }
 
 function ConvertTo-IlegnaJiraDuration {
@@ -2131,7 +2243,7 @@ function Invoke-IlegnaJira {
                 description = $description
                 startedAt = (Get-Date).ToString("o")
             }
-            $timer | ConvertTo-Json | Set-Content -Path (Get-IlegnaTimerPath) -Encoding UTF8
+            $timer | ConvertTo-Json | Set-Content -LiteralPath (Get-IlegnaTimerPath) -Encoding UTF8
             Write-IlegnaLine "Timer started for $issue" Green
         }
         "show" {
@@ -2197,7 +2309,7 @@ function Invoke-IlegnaJira {
                 Add-IlegnaJiraWorklog -Issue $issue -Duration $duration -Comment $comment
             }
 
-            Remove-Item -Path (Get-IlegnaTimerPath) -Force
+            Remove-Item -LiteralPath (Get-IlegnaTimerPath) -Force
             $stoppedDuration = if ($log) { $duration } else { "$($minutes)m" }
             Write-IlegnaLine ("Timer stopped for {0}: {1}" -f $issue, $stoppedDuration) Green
         }
@@ -2354,5 +2466,5 @@ try {
     }
 }
 catch {
-    throw $_.Exception.Message
+    throw
 }
