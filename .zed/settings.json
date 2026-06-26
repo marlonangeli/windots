@@ -7,7 +7,19 @@
       "ensure_final_newline_on_save": true,
       "remove_trailing_whitespace_on_save": true,
       "format_on_save": "on",
-      "formatter": "language_server",
+      "formatter": {
+        "external": {
+          "command": "pwsh",
+          "arguments": [
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$path = $args[0]; $dir = if ([string]::IsNullOrWhiteSpace($path)) { (Get-Location).Path } else { Split-Path -Parent $path }; while ($dir -and -not (Test-Path -LiteralPath (Join-Path $dir 'scripts/format-stdin.ps1'))) { $parent = Split-Path -Parent $dir; if ($parent -eq $dir) { $dir = $null; break }; $dir = $parent }; if (-not $dir) { throw 'Unable to locate scripts/format-stdin.ps1 from buffer path.' }; & (Join-Path $dir 'scripts/format-stdin.ps1') -Path $path",
+            "{buffer_path}"
+          ]
+        }
+      },
       "language_servers": ["powershell-es", "..."]
     }
   },

@@ -1,6 +1,8 @@
 $repoRoot = Join-Path $PSScriptRoot "..\.."
 $ilegnaPath = Join-Path $repoRoot "scripts\ilegna.ps1"
 $backupPath = Join-Path $repoRoot "scripts\config-backup.ps1"
+$formatStdinPath = Join-Path $repoRoot "scripts\format-stdin.ps1"
+$zedSettingsPath = Join-Path $repoRoot ".zed\settings.json"
 $coreProfilePath = Join-Path $repoRoot "home\dot_config\powershell\profile.d\00-core.ps1"
 $envProfilePath = Join-Path $repoRoot "home\dot_config\powershell\profile.d\10-env.ps1"
 $pathProfilePath = Join-Path $repoRoot "home\dot_config\powershell\profile.d\20-path.ps1"
@@ -16,10 +18,12 @@ $promptProfileContent = Get-Content -Path $promptProfilePath -Raw
 $aiProfileContent = Get-Content -Path $aiProfilePath -Raw
 $profileWrapperContent = Get-Content -Path $profileWrapperPath -Raw
 $opencodeRtkPluginContent = Get-Content -Path $opencodeRtkPluginPath -Raw
+$formatStdinContent = Get-Content -Path $formatStdinPath -Raw
+$zedSettingsContent = Get-Content -Path $zedSettingsPath -Raw
 
 Describe "ilegna command surface" {
     It "has valid PowerShell syntax" {
-        foreach ($path in @($ilegnaPath, $backupPath, $coreProfilePath, $envProfilePath, $pathProfilePath, $promptProfilePath, $aiProfilePath, $profileWrapperPath)) {
+        foreach ($path in @($ilegnaPath, $backupPath, $formatStdinPath, $coreProfilePath, $envProfilePath, $pathProfilePath, $promptProfilePath, $aiProfilePath, $profileWrapperPath)) {
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) | Out-Null
@@ -40,11 +44,14 @@ Describe "ilegna command surface" {
     It "shows help for top-level and resource commands" {
         $topLevel = pwsh -NoProfile -File $ilegnaPath -h 2>&1
         $worktree = pwsh -NoProfile -File $ilegnaPath wt -h 2>&1
+        $pullRequests = pwsh -NoProfile -File $ilegnaPath pr -h 2>&1
         $pipelines = pwsh -NoProfile -File $ilegnaPath pipelines -h 2>&1
 
         ($topLevel | Out-String) | Should Match 'ilegna <resource> <command>'
         ($worktree | Out-String) | Should Match 'ilegna wt <command>'
+        ($pullRequests | Out-String) | Should Match 'ilegna pr complete 4406 --wait --timeout 30m'
         ($pipelines | Out-String) | Should Match 'ilegna pipeline <command>'
+        ($pipelines | Out-String) | Should Match 'ilegna pipeline approve-dev --run-id 7995 --wait --timeout 30m'
     }
 
     It "supports bare repo sync refspecs" {
@@ -80,6 +87,19 @@ Describe "ilegna command surface" {
         $content | Should Match '-Default "develop"'
         $content | Should Match '--draft'
         $content | Should Match 'ready", "no-draft'
+        $content | Should Match 'function Invoke-AzurePullRequestComplete'
+        $content | Should Match '"repos", "pr", "update", "--id", \$Id, "--status", "completed"'
+        $content | Should Match 'Get-IlegnaDurationOptionSeconds -Parsed \$parsed -Names @\("timeout", "wait-timeout"\) -DefaultSeconds 1800'
+        $content | Should Match 'Timed out completing Azure pull request'
+    }
+
+    It "uses the repo formatter for Zed PowerShell save formatting" {
+        $zedSettingsContent | Should Match '"format_on_save": "on"'
+        $zedSettingsContent | Should Match '"external"'
+        $zedSettingsContent | Should Match 'scripts/format-stdin\.ps1'
+        $formatStdinContent | Should Match 'Invoke-Formatter @formatArgs'
+        $formatStdinContent | Should Match 'psscriptanalyzer\.psd1'
+        $formatStdinContent | Should Match '\^\(scripts\|modules\|tests\)/\.\*\\\.\(ps1\|psm1\|psd1\)\$'
     }
 
     It "uses ankitpokhrel Jira CLI conventions" {
@@ -175,6 +195,12 @@ Describe "ilegna command surface" {
         $content | Should Match 'Invalid approval status'
         $content | Should Match '\$details = \$_\.ErrorDetails\.Message'
         $content | Should Match 'HTTP \$statusCode'
+        $content | Should Match 'function Invoke-AzureYamlApprovalWithWait'
+        $content | Should Match 'function Get-AzureYamlStageFromTimeline'
+        $content | Should Match '"approve-dev"'
+        $content | Should Match 'Deploy_Dev'
+        $content | Should Match 'Start-Sleep -Seconds \$intervalSeconds'
+        $content | Should Match '--wait requires --run-id <id> for Azure YAML approvals'
     }
 
     It "initializes RTK for OpenCode from PowerShell" {

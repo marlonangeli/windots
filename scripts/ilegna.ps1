@@ -72,15 +72,17 @@ Examples:
 ilegna pr <command> [args]
 
 Commands:
-  new [--target develop] [--ready]   create an Azure DevOps pull request
-  list [raw az args]                 list pull requests
-  view [raw az args]                 view pull request details
-  checkout [raw az args]             checkout a pull request
+  new [--target develop] [--ready]        create an Azure DevOps pull request
+  list [raw az args]                      list pull requests
+  view [raw az args]                      view pull request details
+  checkout [raw az args]                  checkout a pull request
+  complete <id> [--wait --timeout 30m]    complete a pull request
 
 Examples:
   ilegna pr new
   ilegna pr new --ready
   ilegna pr list --status active
+  ilegna pr complete 4406 --wait --timeout 30m
 "@
             return
         }
@@ -97,6 +99,7 @@ Commands:
   approvals [--run-id id] [--stage name]  list pending YAML or release approvals
   complete|approve --approval-id id       approve a YAML or release approval
   complete|approve --run-id id --stage name approve a YAML stage approval
+  approve-dev --run-id id [--wait]        approve Deploy_Dev when available
 
 Examples:
   ilegna pipeline list
@@ -104,6 +107,7 @@ Examples:
   ilegna pipeline trigger --dry-run
   ilegna pipeline approvals --run-id 7995 --stage Deploy_Dev
   ilegna pipeline complete --run-id 7995 --stage Deploy_Dev --dry-run
+  ilegna pipeline approve-dev --run-id 7995 --wait --timeout 30m
 "@
             return
         }
@@ -163,8 +167,8 @@ ilegna <resource> <command> [args]
 Resources:
   wt          git worktrees: list, new, remove, open, status, prune
   git-bare    bare repos: sync, status, refs, path
-  pr          pull requests: new, list, view, checkout
-  pipeline    CI runs: list, watch, open, active, trigger, approvals, complete
+  pr          pull requests: new, list, view, checkout, complete
+  pipeline    CI runs: list, watch, open, active, trigger, approvals, complete, approve-dev
   jira        Jira helpers: me, mine, start, show, stop
   config      local config backups: backup, list, restore
   doctor      quick local environment check
@@ -190,33 +194,33 @@ function ConvertTo-IlegnaResourceName {
     param([string]$Resource)
 
     if ([string]::IsNullOrWhiteSpace($Resource)) {
-        return $null 
+        return $null
     }
 
     switch ($Resource.ToLowerInvariant()) {
         { $_ -in @("wt", "worktree", "worktrees") } {
-            return "wt" 
+            return "wt"
         }
         { $_ -in @("git-bare", "bare") } {
-            return "git-bare" 
+            return "git-bare"
         }
         { $_ -in @("pr", "pull-request", "pull-requests") } {
-            return "pr" 
+            return "pr"
         }
         { $_ -in @("pipeline", "pipelines", "ci") } {
-            return "pipeline" 
+            return "pipeline"
         }
         "jira" {
-            return "jira" 
+            return "jira"
         }
         "config" {
-            return "config" 
+            return "config"
         }
         "doctor" {
-            return "doctor" 
+            return "doctor"
         }
         default {
-            return $Resource.ToLowerInvariant() 
+            return $Resource.ToLowerInvariant()
         }
     }
 }
@@ -227,7 +231,7 @@ function Test-IlegnaHelpRequest {
 
     foreach ($value in @($Values)) {
         if ($value -in @("help", "-h", "--help")) {
-            return $true 
+            return $true
         }
     }
 
@@ -368,6 +372,72 @@ function Test-IlegnaFlag {
     }
 
     return $false
+}
+
+function ConvertTo-IlegnaDurationSeconds {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Value,
+        [string]$OptionName = "duration"
+    )
+
+    $text = $Value.Trim()
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        throw "Invalid $OptionName '$Value'. Use values like 30s, 10m, or 1h."
+    }
+
+    if ($text -match '^\d+$') {
+        $seconds = [int]$text
+        if ($seconds -gt 0) {
+            return $seconds
+        }
+    }
+
+    $matches = [regex]::Matches($text, '(?i)(\d+)\s*(seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h)')
+    if ($matches.Count -eq 0) {
+        throw "Invalid $OptionName '$Value'. Use values like 30s, 10m, or 1h."
+    }
+
+    $matchedText = ""
+    $total = 0
+    foreach ($match in $matches) {
+        $matchedText += $match.Value
+        $amount = [int]$match.Groups[1].Value
+        $unit = $match.Groups[2].Value.ToLowerInvariant()
+        switch -Regex ($unit) {
+            '^s' {
+                $total += $amount; break
+            }
+            '^m' {
+                $total += ($amount * 60); break
+            }
+            '^h' {
+                $total += ($amount * 3600); break
+            }
+        }
+    }
+
+    if (($text -replace '\s', '') -ne ($matchedText -replace '\s', '') -or $total -le 0) {
+        throw "Invalid $OptionName '$Value'. Use values like 30s, 10m, or 1h."
+    }
+
+    return $total
+}
+
+function Get-IlegnaDurationOptionSeconds {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][object]$Parsed,
+        [Parameter(Mandatory)][string[]]$Names,
+        [Parameter(Mandatory)][int]$DefaultSeconds
+    )
+
+    $value = Get-IlegnaOption -Parsed $Parsed -Names $Names
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        return $DefaultSeconds
+    }
+
+    ConvertTo-IlegnaDurationSeconds -Value $value -OptionName ("--{0}" -f $Names[0])
 }
 
 function Assert-GitRepository {
@@ -1240,6 +1310,74 @@ function Invoke-IlegnaPullRequest {
         return ($parsed.Positionals | Select-Object -First 1)
     }
 
+    function Get-AzurePullRequestCompleteArgs {
+        param([Parameter(Mandatory)][string]$Id)
+
+        $azArgs = @("repos", "pr", "update", "--id", $Id, "--status", "completed")
+        foreach ($optionName in @("project", "org", "repository", "detect", "delete-source-branch", "squash", "transition-work-items", "auto-complete", "bypass-policy", "bypass-policy-reason", "merge-commit-message")) {
+            $value = Get-IlegnaOption -Parsed $parsed -Names @($optionName)
+            if (-not [string]::IsNullOrWhiteSpace($value)) {
+                $azArgs += @("--$optionName", $value)
+            }
+        }
+
+        foreach ($flagName in @("delete-source-branch", "squash", "transition-work-items", "auto-complete", "bypass-policy")) {
+            if (Test-IlegnaFlag -Parsed $parsed -Names @($flagName)) {
+                $azArgs += @("--$flagName", "true")
+            }
+        }
+
+        return $azArgs
+    }
+
+    function Invoke-AzurePullRequestCompleteCommand {
+        param([Parameter(Mandatory)][string[]]$AzArgs)
+
+        $output = az @AzArgs 2>&1
+        [pscustomobject]@{
+            ExitCode = $LASTEXITCODE
+            Output = @($output)
+        }
+    }
+
+    function Invoke-AzurePullRequestComplete {
+        param([Parameter(Mandatory)][string]$Id)
+
+        $azArgs = @(Get-AzurePullRequestCompleteArgs -Id $Id)
+        if (Test-IlegnaFlag -Parsed $parsed -Names @("dry-run", "whatif")) {
+            Write-IlegnaLine ("az {0}" -f ($azArgs -join " ")) DarkGray
+            return
+        }
+
+        $wait = Test-IlegnaFlag -Parsed $parsed -Names @("wait")
+        $timeoutSeconds = Get-IlegnaDurationOptionSeconds -Parsed $parsed -Names @("timeout", "wait-timeout") -DefaultSeconds 1800
+        $intervalSeconds = Get-IlegnaDurationOptionSeconds -Parsed $parsed -Names @("interval", "poll-interval") -DefaultSeconds 60
+        $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+        $lastOutput = @()
+
+        while ($true) {
+            $result = Invoke-AzurePullRequestCompleteCommand -AzArgs $azArgs
+            if ($result.ExitCode -eq 0) {
+                $result.Output
+                return
+            }
+
+            $lastOutput = @($result.Output)
+            if (-not $wait) {
+                $lastOutput
+                throw "Unable to complete Azure pull request '$Id'."
+            }
+
+            if ((Get-Date) -ge $deadline) {
+                $lastOutput
+                throw "Timed out completing Azure pull request '$Id' after $timeoutSeconds seconds."
+            }
+
+            Write-IlegnaLine ("Pull request {0} is not complete yet; retrying in {1}s." -f $Id, $intervalSeconds) DarkGray
+            Start-Sleep -Seconds $intervalSeconds
+        }
+    }
+
     switch ($Subcommand.ToLowerInvariant()) {
         { $_ -in @("new", "create") } {
             Assert-GitRepository
@@ -1287,6 +1425,15 @@ function Invoke-IlegnaPullRequest {
                 throw "Usage: ilegna pr checkout <id>"
             }
             az repos pr checkout --id $id
+        }
+        "complete" {
+            Assert-AzureCli
+            $id = Get-PullRequestId
+            if ([string]::IsNullOrWhiteSpace($id)) {
+                throw "Usage: ilegna pr complete <id> [--wait --timeout 30m]"
+            }
+
+            Invoke-AzurePullRequestComplete -Id $id
         }
         default {
             throw "Unknown pr command: $Subcommand"
@@ -1669,8 +1816,18 @@ function Invoke-IlegnaPipeline {
             return $false
         }
 
-        $identifier = if ($Stage.identifier) { [string]$Stage.identifier } else { "" }
-        $name = if ($Stage.name) { [string]$Stage.name } else { "" }
+        $identifier = if ($Stage.identifier) {
+            [string]$Stage.identifier
+        }
+        else {
+            ""
+        }
+        $name = if ($Stage.name) {
+            [string]$Stage.name
+        }
+        else {
+            ""
+        }
         return $identifier.Equals($Filter, [StringComparison]::OrdinalIgnoreCase) `
             -or $name.Equals($Filter, [StringComparison]::OrdinalIgnoreCase) `
             -or $identifier.IndexOf($Filter, [StringComparison]::OrdinalIgnoreCase) -ge 0 `
@@ -1702,7 +1859,8 @@ function Invoke-IlegnaPipeline {
         param(
             [Parameter(Mandatory)][string]$Project,
             [Parameter(Mandatory)][string]$RunId,
-            [string]$StageFilter
+            [string]$StageFilter,
+            [string]$StatusFilter
         )
 
         # Azure DevOps Server exposes YAML approvals as timeline checkpoint records before REST can query them by status.
@@ -1715,7 +1873,12 @@ function Invoke-IlegnaPipeline {
             }
         }
 
-        $statusFilter = Get-IlegnaOption -Parsed $parsed -Names @("status", "status-filter") -Default "pending"
+        $statusFilter = if ([string]::IsNullOrWhiteSpace($StatusFilter)) {
+            Get-IlegnaOption -Parsed $parsed -Names @("status", "status-filter") -Default "pending"
+        }
+        else {
+            $StatusFilter
+        }
         $includeAll = $statusFilter -eq "all"
         $approvals = @()
         foreach ($record in $records) {
@@ -1735,7 +1898,12 @@ function Invoke-IlegnaPipeline {
             $approvals += [pscustomobject]@{
                 runId = $RunId
                 approvalId = $record.id
-                status = if ($record.result) { $record.result } else { $record.state }
+                status = if ($record.result) {
+                    $record.result
+                }
+                else {
+                    $record.state
+                }
                 stageIdentifier = $stage.identifier
                 stageName = $stage.name
                 stageState = $stage.state
@@ -1746,6 +1914,124 @@ function Invoke-IlegnaPipeline {
         }
 
         return @($approvals)
+    }
+
+    function Get-AzureYamlStageFromTimeline {
+        param(
+            [Parameter(Mandatory)][string]$Project,
+            [Parameter(Mandatory)][string]$RunId,
+            [Parameter(Mandatory)][string]$StageFilter
+        )
+
+        $timeline = Get-AzureBuildTimeline -Project $Project -RunId $RunId
+        $stages = @($timeline.records | Where-Object { $_.type -eq "Stage" -and (Test-AzureTimelineStageMatch -Stage $_ -Filter $StageFilter) })
+        if ($stages.Count -eq 0) {
+            return $null
+        }
+        if ($stages.Count -gt 1) {
+            $stages | ConvertTo-Json -Depth 8
+            throw "Multiple YAML stages matched '$StageFilter'. Pass a more specific --stage value."
+        }
+
+        return $stages[0]
+    }
+
+    function Test-AzureYamlStageSucceeded {
+        param([object]$Stage)
+
+        if ($null -eq $Stage -or $Stage.state -ne "completed") {
+            return $false
+        }
+
+        return [string]::IsNullOrWhiteSpace($Stage.result) -or $Stage.result -in @("succeeded", "succeededWithIssues")
+    }
+
+    function Test-AzureYamlStageFailed {
+        param([object]$Stage)
+
+        if ($null -eq $Stage) {
+            return $false
+        }
+        if ($Stage.result -in @("failed", "canceled", "cancelled", "rejected")) {
+            return $true
+        }
+        if ($Stage.state -eq "completed" -and -not (Test-AzureYamlStageSucceeded -Stage $Stage)) {
+            return $true
+        }
+
+        return $false
+    }
+
+    function Invoke-AzureYamlApprovalWithWait {
+        param(
+            [Parameter(Mandatory)][string]$Project,
+            [Parameter(Mandatory)][string]$RunId,
+            [Parameter(Mandatory)][string]$StageFilter
+        )
+
+        if (Test-IlegnaFlag -Parsed $parsed -Names @("dry-run", "whatif")) {
+            throw "--wait cannot be combined with --dry-run because the stage cannot progress."
+        }
+
+        $timeoutSeconds = Get-IlegnaDurationOptionSeconds -Parsed $parsed -Names @("timeout", "wait-timeout") -DefaultSeconds 1800
+        $intervalSeconds = Get-IlegnaDurationOptionSeconds -Parsed $parsed -Names @("interval", "poll-interval") -DefaultSeconds 10
+        $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+        $approvalSubmitted = $false
+        $lastStatus = $null
+
+        while ($true) {
+            $stage = Get-AzureYamlStageFromTimeline -Project $Project -RunId $RunId -StageFilter $StageFilter
+            if (Test-AzureYamlStageSucceeded -Stage $stage) {
+                Write-IlegnaLine ("Azure pipeline stage '{0}' completed with result '{1}'." -f $StageFilter, $stage.result) Cyan
+                return
+            }
+            if (Test-AzureYamlStageFailed -Stage $stage) {
+                throw "Azure pipeline stage '$StageFilter' completed with result '$($stage.result)'."
+            }
+
+            $approvals = @(Get-AzureYamlApprovalsFromTimeline -Project $Project -RunId $RunId -StageFilter $StageFilter -StatusFilter "all")
+            $rejected = @($approvals | Where-Object { $_.status -in @("failed", "canceled", "cancelled", "rejected") })
+            if ($rejected.Count -gt 0) {
+                throw "Azure pipeline approval '$($rejected[0].approvalId)' for stage '$StageFilter' ended with status '$($rejected[0].status)'."
+            }
+
+            $pending = @($approvals | Where-Object { $_.status -in @("inProgress", "pending") -or $_.checkpointState -in @("inProgress", "pending") })
+            if (-not $approvalSubmitted -and $pending.Count -gt 1) {
+                $pending | ConvertTo-Json -Depth 8
+                throw "Multiple pending YAML approvals found for run '$RunId'. Pass a more specific --stage value."
+            }
+            if (-not $approvalSubmitted -and $pending.Count -eq 1) {
+                Write-IlegnaLine ("Approving Azure YAML approval {0} for stage '{1}'." -f $pending[0].approvalId, $StageFilter) Cyan
+                Invoke-AzureYamlApprovalUpdate -Project $Project -ApprovalId $pending[0].approvalId
+                $approvalSubmitted = $true
+            }
+            elseif ($approvals.Count -gt 0 -and $pending.Count -eq 0) {
+                $approvalSubmitted = $true
+            }
+
+            if ((Get-Date) -ge $deadline) {
+                throw "Timed out waiting for Azure pipeline stage '$StageFilter' on run '$RunId' after $timeoutSeconds seconds."
+            }
+
+            $stageState = if ($stage) {
+                $stage.state
+            }
+            else {
+                "notFound"
+            }
+            $stageResult = if ($stage -and $stage.result) {
+                $stage.result
+            }
+            else {
+                "none"
+            }
+            $status = "stage=$stageState result=$stageResult approvalSubmitted=$approvalSubmitted"
+            if ($status -ne $lastStatus) {
+                Write-IlegnaLine ("Waiting for Azure pipeline stage '{0}' on run {1}: {2}." -f $StageFilter, $RunId, $status) DarkGray
+                $lastStatus = $status
+            }
+            Start-Sleep -Seconds $intervalSeconds
+        }
     }
 
     function Get-AzureYamlApprovalById {
@@ -1843,7 +2129,11 @@ function Invoke-IlegnaPipeline {
     }
 
     function Invoke-AzurePipelineApprovals {
-        param([switch]$Approve)
+        param(
+            [switch]$Approve,
+            [string]$DefaultStage,
+            [switch]$RequireRunId
+        )
 
         $project = Get-AzureDevOpsProjectName
         $approvalId = Get-IlegnaOption -Parsed $parsed -Names @("approval-id", "approval", "id")
@@ -1851,10 +2141,25 @@ function Invoke-IlegnaPipeline {
             $approvalId = $parsed.Positionals[0]
         }
         $runId = Get-AzurePipelineRunIdForApprovals -Approve:$Approve
-        $stageFilter = Get-IlegnaOption -Parsed $parsed -Names @("stage", "job", "environment")
+        $stageFilter = Get-IlegnaOption -Parsed $parsed -Names @("stage", "job", "environment") -Default $DefaultStage
+        if ($RequireRunId -and [string]::IsNullOrWhiteSpace($runId)) {
+            throw "Usage: ilegna pipeline approve-dev --run-id <id> [--wait --timeout 30m]"
+        }
+
+        $wait = $Approve -and (Test-IlegnaFlag -Parsed $parsed -Names @("wait"))
+        if ($wait -and [string]::IsNullOrWhiteSpace($runId)) {
+            throw "--wait requires --run-id <id> for Azure YAML approvals."
+        }
+        if ($wait -and [string]::IsNullOrWhiteSpace($stageFilter)) {
+            throw "--wait requires --stage <name> for Azure YAML approvals."
+        }
+
         # Default remains classic Release approvals unless a YAML run/id is explicit.
-        $forceYaml = (Test-IlegnaFlag -Parsed $parsed -Names @("yaml", "checks")) -or -not [string]::IsNullOrWhiteSpace($runId) -or (Test-IlegnaGuidString -Value $approvalId)
+        $forceYaml = (Test-IlegnaFlag -Parsed $parsed -Names @("yaml", "checks")) -or $RequireRunId -or -not [string]::IsNullOrWhiteSpace($runId) -or (Test-IlegnaGuidString -Value $approvalId)
         $forceRelease = Test-IlegnaFlag -Parsed $parsed -Names @("release", "classic")
+        if ($wait -and $forceRelease) {
+            throw "--wait is only supported for YAML pipeline approvals."
+        }
 
         if ($forceRelease -or -not $forceYaml) {
             Invoke-AzureReleaseApproval -Approve:$Approve -Project $project -ApprovalId $approvalId
@@ -1863,6 +2168,11 @@ function Invoke-IlegnaPipeline {
 
         if ([string]::IsNullOrWhiteSpace($project)) {
             throw "Unable to resolve Azure DevOps project. Pass --project <name>."
+        }
+
+        if ($wait) {
+            Invoke-AzureYamlApprovalWithWait -Project $project -RunId $runId -StageFilter $stageFilter
+            return
         }
 
         if (-not [string]::IsNullOrWhiteSpace($runId)) {
@@ -1946,6 +2256,9 @@ function Invoke-IlegnaPipeline {
         }
         { $_ -in @("complete", "approve") } {
             Invoke-AzurePipelineApprovals -Approve
+        }
+        "approve-dev" {
+            Invoke-AzurePipelineApprovals -Approve -DefaultStage "Deploy_Dev" -RequireRunId
         }
         "list" {
             if ($hostName -eq "azure") {
@@ -2310,7 +2623,12 @@ function Invoke-IlegnaJira {
             }
 
             Remove-Item -LiteralPath (Get-IlegnaTimerPath) -Force
-            $stoppedDuration = if ($log) { $duration } else { "$($minutes)m" }
+            $stoppedDuration = if ($log) {
+                $duration
+            }
+            else {
+                "$($minutes)m"
+            }
             Write-IlegnaLine ("Timer stopped for {0}: {1}" -f $issue, $stoppedDuration) Green
         }
         "worklog" {

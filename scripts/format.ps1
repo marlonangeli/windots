@@ -88,7 +88,7 @@ if (-not [string]::IsNullOrWhiteSpace($SettingsPath)) {
 
 $changed = New-Object System.Collections.Generic.List[string]
 foreach ($filePath in $files) {
-    $source = Get-Content -LiteralPath $filePath -Raw -ErrorAction Stop
+    $source = (Get-Content -LiteralPath $filePath -Raw -ErrorAction Stop) -replace "`r`n", "`n"
     $formatArgs = @{ ScriptDefinition = $source }
     if ($settings) {
         $formatArgs.Settings = $settings

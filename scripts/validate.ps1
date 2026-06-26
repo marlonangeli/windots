@@ -43,6 +43,7 @@ $requiredFiles = @(
     "scripts/windots.ps1",
     "scripts/lint.ps1",
     "scripts/format.ps1",
+    "scripts/format-stdin.ps1",
     "scripts/psscriptanalyzer.psd1",
     "scripts/validate.ps1",
     "scripts/validate-modules.ps1",
