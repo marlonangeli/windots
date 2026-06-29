@@ -2,17 +2,25 @@ function Resolve-IlegnaScript {
     [CmdletBinding()]
     param()
 
+    $relativeCandidates = @(
+        "scripts\ilegna-workflow.ps1",
+        "scripts\ilegna.ps1"
+    )
     $candidates = New-Object System.Collections.Generic.List[string]
 
     if (Get-Command chezmoi -ErrorAction SilentlyContinue) {
         $sourcePath = chezmoi source-path 2>$null
         if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($sourcePath)) {
             $sourceRoot = $sourcePath.Trim()
-            $candidates.Add((Join-Path $sourceRoot "scripts\ilegna.ps1"))
+            foreach ($relativeCandidate in $relativeCandidates) {
+                $candidates.Add((Join-Path $sourceRoot $relativeCandidate))
+            }
 
             $sourceParent = Split-Path -Parent $sourceRoot
             if (-not [string]::IsNullOrWhiteSpace($sourceParent)) {
-                $candidates.Add((Join-Path $sourceParent "scripts\ilegna.ps1"))
+                foreach ($relativeCandidate in $relativeCandidates) {
+                    $candidates.Add((Join-Path $sourceParent $relativeCandidate))
+                }
             }
         }
     }
@@ -22,10 +30,14 @@ function Resolve-IlegnaScript {
     }
 
     if (-not [string]::IsNullOrWhiteSpace($env:WINDOTS_REPO_ROOT)) {
-        $candidates.Add((Join-Path $env:WINDOTS_REPO_ROOT "scripts\ilegna.ps1"))
+        foreach ($relativeCandidate in $relativeCandidates) {
+            $candidates.Add((Join-Path $env:WINDOTS_REPO_ROOT $relativeCandidate))
+        }
     }
 
-    $candidates.Add((Join-Path $HOME ".local\share\chezmoi\scripts\ilegna.ps1"))
+    foreach ($relativeCandidate in $relativeCandidates) {
+        $candidates.Add((Join-Path $HOME ".local\share\chezmoi\$relativeCandidate"))
+    }
 
     foreach ($candidate in $candidates) {
         if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path $candidate)) {
